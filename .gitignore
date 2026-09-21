@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# Commit the template so teammates get the local defaults; real values stay local.
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +41,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local database
+server/data/*.db
+server/data/*.db-wal
+server/data/*.db-shm
+
+.commandcode
+.vscode
