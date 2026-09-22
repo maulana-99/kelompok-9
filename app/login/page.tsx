@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+import { saveUser } from "@/lib/session";
+
 export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -30,7 +32,7 @@ export default function LoginPage() {
       return;
     }
 
-    localStorage.setItem("user", JSON.stringify(data));
+    saveUser(data);
     router.push("/dashboard");
   }
 

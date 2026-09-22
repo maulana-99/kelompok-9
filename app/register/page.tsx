@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+import { saveUser } from "@/lib/session";
+
 export default function RegisterPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -30,7 +32,7 @@ export default function RegisterPage() {
       return;
     }
 
-    localStorage.setItem("user", JSON.stringify(data.user));
+    saveUser(data.user);
     router.push("/dashboard");
   }
 

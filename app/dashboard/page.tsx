@@ -1,26 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-type User = { id: number; username: string };
+import { clearUser, useCurrentUser } from "@/lib/session";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const user = useCurrentUser();
 
+  // Redirecting is a navigation, not a state update, so it belongs in an effect.
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (!stored) {
-      router.push("/login");
-      return;
-    }
-    setUser(JSON.parse(stored));
-  }, [router]);
+    if (!user) router.replace("/login");
+  }, [user, router]);
 
   function logout() {
-    localStorage.removeItem("user");
-    router.push("/login");
+    clearUser();
+    router.replace("/login");
   }
 
   if (!user) return null;
@@ -29,11 +25,10 @@ export default function DashboardPage() {
     <main className="flex min-h-screen items-center justify-center">
       <div className="flex flex-col gap-4 w-full max-w-sm p-8 border rounded-xl">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-zinc-500">Signed in as <span className="font-medium text-black">{user.username}</span></p>
-        <button
-          onClick={logout}
-          className="bg-black text-white rounded-lg py-2 font-medium"
-        >
+        <p className="text-zinc-500">
+          Signed in as <span className="font-medium text-black">{user.username}</span>
+        </p>
+        <button onClick={logout} className="bg-black text-white rounded-lg py-2 font-medium">
           Logout
         </button>
       </div>
