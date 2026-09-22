@@ -1,23 +1,26 @@
-import { signUp } from "@/lib/auth";
-import { json, parseJsonBody, toErrorResponse } from "@/lib/http";
+import pool from "@/lib/db";
+import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 
-/**
- * POST /api/auth/register — create an account and start a session.
- *
- * Body: `{ "username": string, "password": string }`
- * 201 `{ data: { user } }` · 400 malformed JSON · 409 username taken
- * 422 validation error (with `fieldErrors`)
- */
-export async function POST(request: Request): Promise<Response> {
+export async function POST(req: Request) {
+  const { username, password } = await req.json();
+
+  if (!username || !password) {
+    return NextResponse.json({ error: "Username and password required" }, { status: 400 });
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+
   try {
-    const body = await parseJsonBody(request);
-    const user = await signUp({
-      username: body.username,
-      password: body.password,
-    });
-
-    return json({ user }, 201);
-  } catch (error) {
-    return toErrorResponse(error);
+    const { rows } = await pool.query(
+      "INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username",
+      [username, hash],
+    );
+    return NextResponse.json({ user: rows[0] }, { status: 201 });
+  } catch (err: unknown) {
+    if (typeof err === "object" && err !== null && (err as { code?: string }).code === "23505") {
+      return NextResponse.json({ error: "Username already taken" }, { status: 409 });
+    }
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 }

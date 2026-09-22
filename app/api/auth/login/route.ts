@@ -1,23 +1,23 @@
-import { signIn } from "@/lib/auth";
-import { json, parseJsonBody, toErrorResponse } from "@/lib/http";
+import pool from "@/lib/db";
+import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 
-/**
- * POST /api/auth/login — verify credentials and start a session.
- *
- * Body: `{ "username": string, "password": string }`
- * 200 `{ data: { user } }` · 400 malformed JSON · 401 invalid credentials
- * 422 validation error (with `fieldErrors`)
- */
-export async function POST(request: Request): Promise<Response> {
-  try {
-    const body = await parseJsonBody(request);
-    const user = await signIn({
-      username: body.username,
-      password: body.password,
-    });
+export async function POST(req: Request) {
+  const { username, password } = await req.json();
 
-    return json({ user });
-  } catch (error) {
-    return toErrorResponse(error);
+  if (!username || !password) {
+    return NextResponse.json({ error: "Username and password required" }, { status: 400 });
   }
+
+  const { rows } = await pool.query(
+    "SELECT id, username, password_hash FROM users WHERE username = $1",
+    [username],
+  );
+
+  const user = rows[0];
+  if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  }
+
+  return NextResponse.json({ id: user.id, username: user.username });
 }
