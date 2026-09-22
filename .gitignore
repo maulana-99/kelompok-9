@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 
+# ytdl-core writes the raw YouTube player script here when its cipher parser
+# fails. Never useful to the project.
+*-player-script.js
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -43,9 +47,11 @@ yarn-error.log*
 next-env.d.ts
 
 # local database
-server/data/*.db
-server/data/*.db-wal
-server/data/*.db-shm
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
 
 .commandcode
 .vscode

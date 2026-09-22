@@ -12,6 +12,9 @@ export default function Home() {
           <Link href="/register" className="border rounded-lg px-5 py-2 font-medium">
             Register
           </Link>
+          <Link href="/music" className="border rounded-lg px-5 py-2 font-medium">
+            Music
+          </Link>
         </div>
       </div>
     </main>
