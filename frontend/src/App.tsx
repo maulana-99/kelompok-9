@@ -1,4 +1,4 @@
-import MelodiMusicDashboard from './MelodiMusicDashboard';
+import MelodiMusicDashboard from './pages/MelodiMusicDashboard';
 import './index.css';
 
 function App() {
