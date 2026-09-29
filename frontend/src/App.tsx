@@ -1,10 +1,7 @@
-import MelodiMusicDashboard from './pages/MelodiMusicDashboard';
-import './index.css';
+import MelodiMusicDashboard from "./pages/MelodiMusicDashboard";
 
 function App() {
-  return (
-    <MelodiMusicDashboard />
-  );
+  return <MelodiMusicDashboard />;
 }
 
 export default App;
