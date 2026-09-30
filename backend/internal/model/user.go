@@ -5,10 +5,9 @@ import "time"
 type User struct {
 	ID        int       `gorm:"primaryKey" json:"id"`
 	Name      string    `gorm:"type:varchar(100);not null" json:"name"`
-	Email     string    `gorm:"type:varchar(150);uniqueIndex;not null;" json:"email"`
-	Password  string    `gorm:"type:varchar(255);not null" json:"password"`
-	CreatedAt time.Time `gorm:"type:timestamp;not null" json:"created_at"`
-	UpdatedAt time.Time `gorm:"type:timestamp;not null" json:"updated_at"`
+	Username  string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"username"`
+	Password  string    `gorm:"type:varchar(255);not null" json:"-"`
+	CreatedAt time.Time `gorm:"type:timestamp;not null;default:now()" json:"created_at"`
 }
 
 func (User) TableName() string {
@@ -17,22 +16,21 @@ func (User) TableName() string {
 
 type CreateUserRequest struct {
 	Name     string `json:"name" binding:"required,min=2,max=100"`
-	Email    string `json:"email" binding:"required,email"`
+	Username string `json:"username" binding:"required,min=3,max=50,alphanum"`
 	Password string `json:"password" binding:"required,min=8"`
 }
 
 type UserResponse struct {
 	ID        int       `json:"id"`
 	Name      string    `json:"name"`
-	Email     string    `json:"email"`
+	Username  string    `json:"username"`
 	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type UpdateUserRequest struct {
-	Name     string `json:"name" binding:"required,min=2,max=100"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	Name     string `json:"name" binding:"omitempty,min=2,max=100"`
+	Username string `json:"username" binding:"omitempty,min=3,max=50,alphanum"`
+	Password string `json:"password" binding:"omitempty,min=8"`
 }
 
 type ErrUserNotFound struct {

@@ -31,6 +31,10 @@ func (h *UserHandler) Create(c *gin.Context) {
 
 	user, err := h.service.CreateUser(req)
 	if err != nil {
+		if errors.Is(err, service.ErrUsernameTaken) {
+			response.Error(c, http.StatusConflict, err.Error(), nil)
+			return
+		}
 		response.Error(c, http.StatusInternalServerError, "gagal membuat user", err.Error())
 		return
 	}
@@ -90,6 +94,10 @@ func (h *UserHandler) Update(c *gin.Context) {
 			response.Error(c, http.StatusNotFound, err.Error(), nil)
 			return
 		}
+		if errors.Is(err, service.ErrUsernameTaken) {
+			response.Error(c, http.StatusConflict, err.Error(), nil)
+			return
+		}
 		response.Error(c, http.StatusInternalServerError, "gagal update user", err.Error())
 		return
 	}
@@ -117,11 +125,11 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	response.Success(c, http.StatusOK, "user berhasil dihapus", nil)
 }
 
-func parseID(c *gin.Context) (uint, error) {
+func parseID(c *gin.Context) (int, error) {
 	idParam := c.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
+	id, err := strconv.Atoi(idParam)
 	if err != nil {
 		return 0, err
 	}
-	return uint(id), nil
+	return id, nil
 }

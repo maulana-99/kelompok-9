@@ -33,8 +33,23 @@ func New(db *gorm.DB) *gin.Engine {
 	userService := service.NewUserService(userRepo)
 	userHandler := handler.NewUserHandler(userService)
 
+	// --- wiring dependency untuk resource "auth" ---
+	sessionRepo := repository.NewSessionRepository(db)
+	authService := service.NewAuthService(userRepo, sessionRepo)
+	authHandler := handler.NewAuthHandler(authService)
+	requireAuth := middleware.Auth(authService)
+
 	v1 := r.Group("/api/v1")
 	{
+		auth := v1.Group("/auth")
+		{
+			auth.POST("/login", authHandler.Login)
+			auth.POST("/logout", authHandler.Logout)
+
+			// /me valid token needed, so Auth middleware applied to it
+			auth.GET("/me", requireAuth, authHandler.Me)
+		}
+
 		users := v1.Group("/users")
 		{
 			users.POST("", userHandler.Create)
