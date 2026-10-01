@@ -11,7 +11,6 @@ import (
 
 	"backend/internal/config"
 	"backend/internal/database"
-	"backend/internal/model"
 	"backend/internal/router"
 
 	"github.com/gin-gonic/gin"
@@ -30,8 +29,8 @@ func main() {
 		log.Fatalf("fatal: %v", err)
 	}
 
-	// Auto-migrate: tambahkan model baru di sini kalau bikin resource baru.
-	if err := db.AutoMigrate(&model.User{}); err != nil {
+	// Jalankan migration SQL dari folder migrations/ (lihat internal/database/migrate.go).
+	if err := database.Migrate(db); err != nil {
 		log.Fatalf("fatal: gagal migrate database: %v", err)
 	}
 
