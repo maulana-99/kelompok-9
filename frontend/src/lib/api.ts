@@ -1,4 +1,4 @@
-const API_URL: string =
+export const API_URL: string =
   (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080/api/v1';
 
 // Backend responses always wrap the results in this envelope

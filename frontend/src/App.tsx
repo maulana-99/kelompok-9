@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import MelodiMusicDashboard from './pages/MelodiMusicDashboard';
+import Music from './pages/Music';
 import Signup from './pages/Signup';
 import './index.css';
 
@@ -32,6 +33,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/music" element={<Music />} />
           <Route
             path="/"
             element={

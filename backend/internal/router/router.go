@@ -59,6 +59,17 @@ func New(db *gorm.DB) *gin.Engine {
 			users.DELETE("/:id", userHandler.Delete)
 		}
 
+		// --- Wiring dependency for the music resource (scraping YouTube Music and no local tables) ---
+		musicService := service.NewMusicService()
+		musicHandler := handler.NewMusicHandler(musicService)
+
+		music := v1.Group("/music")
+		{
+			music.GET("/search", musicHandler.Search)
+			music.GET("/thumb", musicHandler.Thumb)
+			music.GET("/:musicId/stream", musicHandler.Stream)
+		}
+
 		// Tambahkan resource lain di sini, contoh:
 		// products := v1.Group("/products")
 		// {

@@ -61,7 +61,6 @@ CREATE TABLE playlist_song (
     id          SERIAL       PRIMARY KEY,
     playlist_id INTEGER      NOT NULL REFERENCES playlist (id) ON DELETE CASCADE,
     music_id    VARCHAR(255),
-    status      VARCHAR(50),
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
     CONSTRAINT playlist_song_unique_track UNIQUE (playlist_id, music_id)
 );
