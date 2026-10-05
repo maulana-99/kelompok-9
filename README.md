@@ -80,22 +80,6 @@ cp .env.example .env      # lalu sesuaikan isinya
 go mod download
 ```
 
-Isi `.env`:
-
-```env
-APP_ENV=development
-PORT=8080
-GIN_MODE=debug
-
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=kelompok9
-DB_PASSWORD=kelompok9
-DB_NAME=kelompok9
-DB_SSLMODE=disable
-DB_TIMEZONE=Asia/Jakarta
-```
-
 Jalankan:
 
 ```bash
@@ -154,30 +138,6 @@ cd frontend && npm run dev            # http://localhost:5173
 ```
 
 Backend sudah mengizinkan CORS dari origin mana pun, jadi frontend bisa langsung memanggil `http://localhost:8080/api/v1/...`.
-
-### Verifikasi cepat
-
-```bash
-# 1. backend hidup
-curl localhost:8080/health
-
-# 2. migration terpasang (harus ada 6 tabel + schema_migrations)
-PGPASSWORD=kelompok9 psql -h localhost -U kelompok9 -d kelompok9 -c '\dt'
-
-# 3. endpoint user jalan
-curl -X POST localhost:8080/api/v1/users -H 'Content-Type: application/json' \
-  -d '{"name":"Budi Santoso","username":"budi","password":"rahasia123"}'
-
-# 4. frontend jalan
-curl -o /dev/null -w '%{http_code}\n' http://localhost:5173/    # harap 200
-```
-
-Build produksi (wajib lulus sebelum push):
-
-```bash
-cd backend  && go build ./... && go vet ./...
-cd frontend && npm run build
-```
 
 ---
 

@@ -11,11 +11,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// ErrInvalidCredentials used by handler to response 401 Unauthorized.
-var ErrInvalidCredentials = errors.New("username atau password salah")
-
-// ErrUnauthorized are used when the token unrecognized / user session was ended.
-var ErrUnauthorized = errors.New("belum login")
+var (
+	ErrInvalidCredentials = errors.New("username atau password salah")
+	ErrUnauthorized       = errors.New("belum login")
+)
 
 type AuthService interface {
 	Login(req model.LoginRequest) (*model.AuthResponse, error)
@@ -35,7 +34,6 @@ func NewAuthService(userRepo repository.UserRepository, sessionRepo repository.S
 func (s *authService) Login(req model.LoginRequest) (*model.AuthResponse, error) {
 	user, err := s.userRepo.FindByUsername(req.Username)
 	if err != nil {
-		// User not found or wrong password 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrInvalidCredentials
 		}
@@ -46,7 +44,7 @@ func (s *authService) Login(req model.LoginRequest) (*model.AuthResponse, error)
 		return nil, ErrInvalidCredentials
 	}
 
-	// one login = one new session, old session will terminated
+	// One active session per user: logging in ends the previous session.
 	if err := s.sessionRepo.DeleteByUserID(user.ID); err != nil {
 		return nil, err
 	}
@@ -107,7 +105,6 @@ func (s *authService) GetUserByToken(token string) (*model.User, error) {
 	return user, nil
 }
 
-// generateToken generate a 32 byte random token using crypto/rand, hopefully the user cant guess it hehe..
 func generateToken() (string, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
