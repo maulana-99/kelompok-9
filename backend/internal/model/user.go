@@ -32,11 +32,3 @@ type UpdateUserRequest struct {
 	Username string `json:"username" binding:"omitempty,min=3,max=50,alphanum"`
 	Password string `json:"password" binding:"omitempty,min=8"`
 }
-
-type ErrUserNotFound struct {
-	Message string `json:"message"`
-}
-
-func (e ErrUserNotFound) Error() string {
-	return e.Message
-}

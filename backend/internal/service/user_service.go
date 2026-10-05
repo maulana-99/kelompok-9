@@ -4,19 +4,20 @@ import (
 	"backend/internal/model"
 	"backend/internal/repository"
 	"errors"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
-var ErrNotFound = errors.New("not found")
-
-// ErrUsernameTaken dipakai handler untuk membalas 409 Conflict.
-var ErrUsernameTaken = errors.New("username sudah dipakai")
+var (
+	ErrNotFound      = errors.New("not found")
+	ErrUsernameTaken = errors.New("username sudah dipakai")
+)
 
 type UserService interface {
 	CreateUser(req model.CreateUserRequest) (*model.User, error)
-	GetAllUsers() ([]model.User, error)
+	GetAllUsers(query string) ([]model.User, error)
 	GetUserByID(id int) (*model.User, error)
 	UpdateUser(id int, req model.UpdateUserRequest) (*model.User, error)
 	DeleteUser(id int) error
@@ -54,15 +55,15 @@ func (s *userService) CreateUser(req model.CreateUserRequest) (*model.User, erro
 	return user, nil
 }
 
-func (s *userService) GetAllUsers() ([]model.User, error) {
-	return s.repo.FindAll()
+func (s *userService) GetAllUsers(query string) ([]model.User, error) {
+	return s.repo.FindAll(strings.TrimSpace(query))
 }
 
 func (s *userService) GetUserByID(id int) (*model.User, error) {
 	user, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, model.ErrUserNotFound{Message: "user not found"}
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}
@@ -103,13 +104,12 @@ func (s *userService) UpdateUser(id int, req model.UpdateUserRequest) (*model.Us
 }
 
 func (s *userService) DeleteUser(id int) error {
-	if _, err := s.repo.FindByID(id); err != nil {
+	if _, err := s.GetUserByID(id); err != nil {
 		return err
 	}
 	return s.repo.Delete(id)
 }
 
-// hashPassword memakai bcrypt. Password plaintext tidak pernah disimpan ke DB.
 func hashPassword(plain string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
 	if err != nil {

@@ -29,7 +29,6 @@ func main() {
 		log.Fatalf("fatal: %v", err)
 	}
 
-	// Jalankan migration SQL dari folder migrations/ (lihat internal/database/migrate.go).
 	if err := database.Migrate(db); err != nil {
 		log.Fatalf("fatal: gagal migrate database: %v", err)
 	}
@@ -41,7 +40,6 @@ func main() {
 		Handler: r,
 	}
 
-	// Jalankan server di goroutine supaya tidak blocking, biar bisa handle graceful shutdown.
 	go func() {
 		log.Printf("server jalan di port %s (env: %s)\n", cfg.Port, cfg.AppEnv)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -49,7 +47,6 @@ func main() {
 		}
 	}()
 
-	// Tunggu sinyal interrupt/terminate untuk shutdown yang rapi.
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

@@ -2,13 +2,14 @@ package repository
 
 import (
 	"backend/internal/model"
+	"strings"
 
 	"gorm.io/gorm"
 )
 
 type UserRepository interface {
 	Create(user *model.User) error
-	FindAll() ([]model.User, error)
+	FindAll(query string) ([]model.User, error)
 	FindByID(id int) (*model.User, error)
 	FindByUsername(username string) (*model.User, error)
 	Update(user *model.User) error
@@ -27,9 +28,14 @@ func (r *userRepository) Create(user *model.User) error {
 	return r.db.Create(user).Error
 }
 
-func (r *userRepository) FindAll() ([]model.User, error) {
+func (r *userRepository) FindAll(query string) ([]model.User, error) {
 	var users []model.User
-	if err := r.db.Order("id asc").Find(&users).Error; err != nil {
+	tx := r.db.Order("id asc")
+	if query != "" {
+		pattern := "%" + escapeLike(query) + "%"
+		tx = tx.Where("name ILIKE ? OR username ILIKE ?", pattern, pattern)
+	}
+	if err := tx.Find(&users).Error; err != nil {
 		return nil, err
 	}
 	return users, nil
@@ -57,4 +63,9 @@ func (r *userRepository) Update(user *model.User) error {
 
 func (r *userRepository) Delete(id int) error {
 	return r.db.Delete(&model.User{}, id).Error
+}
+
+// escapeLike escapes LIKE wildcards so user input is matched literally.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(s)
 }

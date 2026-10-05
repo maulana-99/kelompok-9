@@ -9,9 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Auth will verify "Authorization: Bearer <token>" token through AuthService.
-// when (yh) valid, the userID and user stored to the context so handler dont need to query db again
-// when invalid, request cacelled and returns 401 error.
+// Auth validates the Bearer token and stores "userID" and "user" in the context.
+// Invalid or missing tokens get 401.
 func Auth(authService service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, err := authService.GetUserByToken(TokenFromHeader(c))
@@ -27,7 +26,7 @@ func Auth(authService service.AuthService) gin.HandlerFunc {
 	}
 }
 
-// TokenFromHeader parse the "Authorization: Bearer <token>" header, returns empty string if the header missing or format was incorrect
+// TokenFromHeader returns the Bearer token, or "" if the header is missing or malformed.
 func TokenFromHeader(c *gin.Context) string {
 	header := c.GetHeader("Authorization")
 	if len(header) < 8 || !strings.EqualFold(header[:7], "Bearer ") {
