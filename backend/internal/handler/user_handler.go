@@ -125,6 +125,50 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	response.Success(c, http.StatusOK, "user berhasil dihapus", nil)
 }
 
+// Endpoint Followers & Following
+// GET /api/v1/users/:id/followers
+func (h *UserHandler) GetFollowers(c *gin.Context) {
+	id, err := parseID(c)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "id tidak valid", nil)
+		return
+	}
+
+	followers, err := h.service.GetFollowers(id)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.Error(c, http.StatusNotFound, err.Error(), nil)
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "gagal mengambil daftar follower", err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, "berhasil mengambil daftar follower", followers)
+}
+
+// GET /api/v1/users/:id/following
+func (h *UserHandler) GetFollowing(c *gin.Context) {
+	id, err := parseID(c)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "id tidak valid", nil)
+		return
+	}
+
+	following, err := h.service.GetFollowing(id)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.Error(c, http.StatusNotFound, err.Error(), nil)
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "gagal mengambil daftar user yang diikuti", err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, "berhasil mengambil daftar user yang diikuti", following)
+}
+
+// Helper function
 func parseID(c *gin.Context) (int, error) {
 	idParam := c.Param("id")
 	id, err := strconv.Atoi(idParam)

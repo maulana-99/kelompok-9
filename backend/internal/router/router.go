@@ -57,6 +57,10 @@ func New(db *gorm.DB) *gin.Engine {
 			users.GET("/:id", userHandler.GetByID)
 			users.PUT("/:id", userHandler.Update)
 			users.DELETE("/:id", userHandler.Delete)
+
+			// Endpoint tambahan followers & following
+			users.GET("/:id/followers", userHandler.GetFollowers)
+			users.GET("/:id/following", userHandler.GetFollowing)
 		}
 
 		// Tambahkan resource lain di sini, contoh:

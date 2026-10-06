@@ -13,6 +13,10 @@ type UserRepository interface {
 	FindByUsername(username string) (*model.User, error)
 	Update(user *model.User) error
 	Delete(id int) error
+
+	GetFollowers(userID int) ([]model.User, error)
+	GetFollowing(userID int) ([]model.User, error)
+	
 }
 
 type userRepository struct {
@@ -57,4 +61,28 @@ func (r *userRepository) Update(user *model.User) error {
 
 func (r *userRepository) Delete(id int) error {
 	return r.db.Delete(&model.User{}, id).Error
+}
+
+func (r *userRepository) GetFollowers(userID int) ([]model.User, error) {
+	var followers []model.User
+	// Ubah "follows" menjadi "follow"
+	err := r.db.Joins("JOIN follow ON follow.follower_id = users.id").
+		Where("follow.following_id = ?", userID).
+		Find(&followers).Error
+	if err != nil {
+		return nil, err
+	}
+	return followers, nil
+}
+
+func (r *userRepository) GetFollowing(userID int) ([]model.User, error) {
+	var following []model.User
+	// Ubah "follows" menjadi "follow"
+	err := r.db.Joins("JOIN follow ON follow.following_id = users.id").
+		Where("follow.follower_id = ?", userID).
+		Find(&following).Error
+	if err != nil {
+		return nil, err
+	}
+	return following, nil
 }
