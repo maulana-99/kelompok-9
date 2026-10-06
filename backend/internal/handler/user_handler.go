@@ -102,7 +102,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 	response.Success(c, http.StatusOK, "user berhasil diupdate", user)
 }
 
-// DELETE /api/v1/users/:id (auth, owner-only). Data turunan ikut terhapus lewat ON DELETE CASCADE.
+// DELETE /api/v1/users/:id (auth, owner-only)
 func (h *UserHandler) Delete(c *gin.Context) {
 	id, ok := ownerID(c)
 	if !ok {
@@ -121,7 +121,6 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	response.Success(c, http.StatusOK, "user berhasil dihapus", nil)
 }
 
-// Endpoint Followers & Following
 // GET /api/v1/users/:id/followers
 func (h *UserHandler) GetFollowers(c *gin.Context) {
 	id, err := parseID(c)
@@ -164,12 +163,15 @@ func (h *UserHandler) GetFollowing(c *gin.Context) {
 	response.Success(c, http.StatusOK, "berhasil mengambil daftar user yang diikuti", following)
 }
 
-// Helper function
+// Helper functions
 func parseID(c *gin.Context) (int, error) {
-	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
-// ownerID parses :id and makes sure it belongs to the logged-in user.
-// It writes the error response itself, so the caller only needs to return.
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		return 0, errors.New("invalid id")
+	}
+	return id, nil
+}
+
 func ownerID(c *gin.Context) (int, bool) {
 	id, err := parseID(c)
 	if err != nil {
@@ -181,12 +183,4 @@ func ownerID(c *gin.Context) (int, bool) {
 		return 0, false
 	}
 	return id, true
-}
-
-func parseID(c *gin.Context) (int, error) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil || id <= 0 {
-		return 0, errors.New("invalid id")
-	}
-	return id, nil
 }
