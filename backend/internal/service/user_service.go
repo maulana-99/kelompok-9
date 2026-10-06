@@ -21,6 +21,10 @@ type UserService interface {
 	GetUserByID(id int) (*model.User, error)
 	UpdateUser(id int, req model.UpdateUserRequest) (*model.User, error)
 	DeleteUser(id int) error
+
+	// Tipe return disamakan jadi []model.User
+	GetFollowers(id int) ([]model.User, error)
+	GetFollowing(id int) ([]model.User, error)
 }
 
 type userService struct {
@@ -110,6 +114,25 @@ func (s *userService) DeleteUser(id int) error {
 	return s.repo.Delete(id)
 }
 
+func (s *userService) GetFollowers(id int) ([]model.User, error) {
+	// Panggil s.repo (bukan s.userRepo)
+	_, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	return s.repo.GetFollowers(id)
+}
+
+func (s *userService) GetFollowing(id int) ([]model.User, error) {
+	// Panggil s.repo (bukan s.userRepo)
+	_, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	return s.repo.GetFollowing(id)
+}
+
+// hashPassword memakai bcrypt. Password plaintext tidak pernah disimpan ke DB.
 func hashPassword(plain string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
 	if err != nil {

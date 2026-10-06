@@ -40,6 +40,12 @@ func New(db *gorm.DB) *gin.Engine {
 			users.POST("", userHandler.Create)
 			users.GET("", userHandler.GetAll)
 			users.GET("/:id", userHandler.GetByID)
+			users.PUT("/:id", userHandler.Update)
+			users.DELETE("/:id", userHandler.Delete)
+
+			// Endpoint tambahan followers & following
+			users.GET("/:id/followers", userHandler.GetFollowers)
+			users.GET("/:id/following", userHandler.GetFollowing)
 			users.PUT("/:id", requireAuth, userHandler.Update)
 			users.DELETE("/:id", requireAuth, userHandler.Delete)
 		}
