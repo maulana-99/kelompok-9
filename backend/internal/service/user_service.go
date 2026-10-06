@@ -25,6 +25,9 @@ type UserService interface {
 	// Tipe return disamakan jadi []model.User
 	GetFollowers(id int) ([]model.User, error)
 	GetFollowing(id int) ([]model.User, error)
+
+	FollowUser(followerID int, followingID int) error
+	UnfollowUser(followerID int, followingID int) error
 }
 
 type userService struct {
@@ -130,6 +133,25 @@ func (s *userService) GetFollowing(id int) ([]model.User, error) {
 		return nil, ErrNotFound
 	}
 	return s.repo.GetFollowing(id)
+}
+
+func (s *userService) FollowUser(followerID int, followingID int) error {
+	if followerID == followingID {
+		return errors.New("tidak bisa follow diri sendiri")
+	}
+	_, err := s.repo.FindByID(followingID)
+	if err != nil {
+		return ErrNotFound
+	}
+	return s.repo.Follow(followerID, followingID)
+}
+
+func (s *userService) UnfollowUser(followerID int, followingID int) error {
+	_, err := s.repo.FindByID(followingID)
+	if err != nil {
+		return ErrNotFound
+	}
+	return s.repo.Unfollow(followerID, followingID)
 }
 
 // hashPassword memakai bcrypt. Password plaintext tidak pernah disimpan ke DB.

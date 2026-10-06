@@ -163,6 +163,61 @@ func (h *UserHandler) GetFollowing(c *gin.Context) {
 	response.Success(c, http.StatusOK, "berhasil mengambil daftar user yang diikuti", following)
 }
 
+// POST /api/v1/users/:id/follow
+func (h *UserHandler) Follow(c *gin.Context) {
+	targetID, err := parseID(c)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "id tidak valid", nil)
+		return
+	}
+
+	// Mengambil ID user yang sedang login dari konteks middleware/session
+	userIDVal, exists := c.Get("userID")
+	if !exists {
+		response.Error(c, http.StatusUnauthorized, "unauthorized", nil)
+		return
+	}
+	currentUserID := userIDVal.(int)
+
+	if err := h.service.FollowUser(currentUserID, targetID); err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.Error(c, http.StatusNotFound, err.Error(), nil)
+			return
+		}
+		response.Error(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "berhasil follow user", nil)
+}
+
+// DELETE /api/v1/users/:id/follow (atau /unfollow)
+func (h *UserHandler) Unfollow(c *gin.Context) {
+	targetID, err := parseID(c)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "id tidak valid", nil)
+		return
+	}
+
+	userIDVal, exists := c.Get("userID")
+	if !exists {
+		response.Error(c, http.StatusUnauthorized, "unauthorized", nil)
+		return
+	}
+	currentUserID := userIDVal.(int)
+
+	if err := h.service.UnfollowUser(currentUserID, targetID); err != nil {
+		if errors.Is(err, service.ErrNotFound) {
+			response.Error(c, http.StatusNotFound, err.Error(), nil)
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "gagal unfollow user", err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, "berhasil unfollow user", nil)
+}
+
 // Helper functions
 func parseID(c *gin.Context) (int, error) {
 	id, err := strconv.Atoi(c.Param("id"))
