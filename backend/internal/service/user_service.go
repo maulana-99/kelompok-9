@@ -4,22 +4,30 @@ import (
 	"backend/internal/model"
 	"backend/internal/repository"
 	"errors"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
-var ErrNotFound = errors.New("not found")
-
-// ErrUsernameTaken dipakai handler untuk membalas 409 Conflict.
-var ErrUsernameTaken = errors.New("username sudah dipakai")
+var (
+	ErrNotFound      = errors.New("not found")
+	ErrUsernameTaken = errors.New("username sudah dipakai")
+)
 
 type UserService interface {
 	CreateUser(req model.CreateUserRequest) (*model.User, error)
-	GetAllUsers() ([]model.User, error)
+	GetAllUsers(query string) ([]model.User, error)
 	GetUserByID(id int) (*model.User, error)
 	UpdateUser(id int, req model.UpdateUserRequest) (*model.User, error)
 	DeleteUser(id int) error
+
+	// Tipe return disamakan jadi []model.User
+	GetFollowers(id int) ([]model.User, error)
+	GetFollowing(id int) ([]model.User, error)
+
+	FollowUser(followerID int, followingID int) error
+	UnfollowUser(followerID int, followingID int) error
 }
 
 type userService struct {
@@ -54,15 +62,15 @@ func (s *userService) CreateUser(req model.CreateUserRequest) (*model.User, erro
 	return user, nil
 }
 
-func (s *userService) GetAllUsers() ([]model.User, error) {
-	return s.repo.FindAll()
+func (s *userService) GetAllUsers(query string) ([]model.User, error) {
+	return s.repo.FindAll(strings.TrimSpace(query))
 }
 
 func (s *userService) GetUserByID(id int) (*model.User, error) {
 	user, err := s.repo.FindByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, model.ErrUserNotFound{Message: "user not found"}
+			return nil, ErrNotFound
 		}
 		return nil, err
 	}
@@ -103,10 +111,47 @@ func (s *userService) UpdateUser(id int, req model.UpdateUserRequest) (*model.Us
 }
 
 func (s *userService) DeleteUser(id int) error {
-	if _, err := s.repo.FindByID(id); err != nil {
+	if _, err := s.GetUserByID(id); err != nil {
 		return err
 	}
 	return s.repo.Delete(id)
+}
+
+func (s *userService) GetFollowers(id int) ([]model.User, error) {
+	// Panggil s.repo (bukan s.userRepo)
+	_, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	return s.repo.GetFollowers(id)
+}
+
+func (s *userService) GetFollowing(id int) ([]model.User, error) {
+	// Panggil s.repo (bukan s.userRepo)
+	_, err := s.repo.FindByID(id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	return s.repo.GetFollowing(id)
+}
+
+func (s *userService) FollowUser(followerID int, followingID int) error {
+	if followerID == followingID {
+		return errors.New("tidak bisa follow diri sendiri")
+	}
+	_, err := s.repo.FindByID(followingID)
+	if err != nil {
+		return ErrNotFound
+	}
+	return s.repo.Follow(followerID, followingID)
+}
+
+func (s *userService) UnfollowUser(followerID int, followingID int) error {
+	_, err := s.repo.FindByID(followingID)
+	if err != nil {
+		return ErrNotFound
+	}
+	return s.repo.Unfollow(followerID, followingID)
 }
 
 // hashPassword memakai bcrypt. Password plaintext tidak pernah disimpan ke DB.

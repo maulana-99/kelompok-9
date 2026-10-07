@@ -1,60 +1,70 @@
-import { useState } from 'react';
+import { Search as SearchIcon, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 
-// Data dummy lagu untuk dicari
-const DUMMY_SONGS = [
-  { id: 1, title: 'Still With You', artist: 'Jung Kook', album: 'Single' },
-  { id: 2, title: 'Seven', artist: 'Jung Kook', album: 'Golden' },
-  { id: 3, title: 'Night Dancer', artist: 'imase', album: 'POP' },
-  { id: 4, title: 'Ditto', artist: 'NewJeans', album: 'OMG' },
-];
-
-export default function SearchPage() {
-  const [query, setQuery] = useState('');
-
-  // Filter lagu berdasarkan input pencarian
-  const filteredSongs = DUMMY_SONGS.filter(
-    (song) =>
-      song.title.toLowerCase().includes(query.toLowerCase()) ||
-      song.artist.toLowerCase().includes(query.toLowerCase())
-  );
-
+export default function Search() {
   return (
-    <div className="p-6 text-white space-y-6">
-      <h1 className="text-2xl font-bold">Pencarian Musik</h1>
-      
-      {/* Input Search */}
-      <div className="relative max-w-md">
+    <div className="min-h-screen bg-[#1B1B1B] px-8 py-6 text-[#F3F3F3]">
+
+      <Link
+        to="/home"
+        className="mb-8 flex w-fit items-center gap-2 text-sm text-gray-400 hover:text-white"
+      >
+        <ArrowLeft size={18} />
+        Back to Home
+      </Link>
+
+      <h1 className="text-3xl font-bold">
+        Search
+      </h1>
+
+      <p className="mt-2 text-sm text-gray-500">
+        Search for songs, artists, albums, or playlists.
+      </p>
+
+      <div className="mt-8 flex max-w-3xl items-center gap-3 rounded-full bg-[#252525] px-5 py-4">
+        <SearchIcon size={20} className="text-gray-400" />
+
         <input
           type="text"
-          placeholder="Cari lagu, artis, atau album..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full px-4 py-2 rounded-full bg-[#1e1b2e] border border-gray-700 text-sm focus:outline-none focus:border-purple-500"
+          placeholder="What do you want to listen to?"
+          className="w-full bg-transparent text-sm text-white outline-none placeholder:text-gray-500"
         />
       </div>
 
-      {/* Hasil Pencarian */}
-      <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-gray-400">Hasil</h2>
-        {filteredSongs.length > 0 ? (
-          <div className="grid gap-3">
-            {filteredSongs.map((song) => (
-              <div
-                key={song.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-[#181524] hover:bg-[#231f36] transition cursor-pointer"
-              >
-                <div>
-                  <p className="font-medium text-white">{song.title}</p>
-                  <p className="text-xs text-gray-400">{song.artist}</p>
-                </div>
-                <span className="text-xs text-gray-500">{song.album}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500">Lagu tidak ditemukan.</p>
-        )}
+      <h2 className="mt-10 text-xl font-bold">
+        Browse All
+      </h2>
+
+      <div className="mt-5 grid grid-cols-2 gap-5 md:grid-cols-4">
+        <div className="rounded-xl bg-[#E9204F] p-6">
+          <h3 className="text-lg font-bold">Music</h3>
+          <p className="mt-2 text-sm text-white/70">
+            Find your favorite music
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-[#252525] p-6">
+          <h3 className="text-lg font-bold">Artists</h3>
+          <p className="mt-2 text-sm text-gray-400">
+            Search your favorite artists
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-[#252525] p-6">
+          <h3 className="text-lg font-bold">Albums</h3>
+          <p className="mt-2 text-sm text-gray-400">
+            Explore albums
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-[#252525] p-6">
+          <h3 className="text-lg font-bold">Playlists</h3>
+          <p className="mt-2 text-sm text-gray-400">
+            Discover playlists
+          </p>
+        </div>
       </div>
+
     </div>
   );
 }

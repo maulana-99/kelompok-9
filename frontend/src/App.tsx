@@ -1,13 +1,19 @@
-import type { ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
-import MelodiMusicDashboard from './pages/MelodiMusicDashboard';
-import Music from './pages/Music';
-import Signup from './pages/Signup';
-import './index.css';
-
 // RequireAuth (only accessible if the user are logged in.. otherwise, redirect to login page)
+import type { ReactNode } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+
+import MelodiMusicDashboard from "./pages/MelodiMusicDashboard";
+import Music from './pages/Music';
+import Search from "./pages/search";
+import Library from "./pages/library";
+import LikedSongs from "./pages/likedSongs";
+
+import "./index.css";
+
 function RequireAuth({ children }: { children: ReactNode }) {
   const { token, ready } = useAuth();
 
@@ -42,6 +48,43 @@ function App() {
               </RequireAuth>
             }
           />
+
+          <Route
+            path="/home"
+            element={
+              <RequireAuth>
+                <MelodiMusicDashboard />
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/search"
+            element={
+              <RequireAuth>
+                <Search />
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/library"
+            element={
+              <RequireAuth>
+                <Library />
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/liked-songs"
+            element={
+              <RequireAuth>
+                <LikedSongs />
+              </RequireAuth>
+            }
+          />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
