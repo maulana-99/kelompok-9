@@ -1,3 +1,4 @@
+// RequireAuth (only accessible if the user are logged in.. otherwise, redirect to login page)
 import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
@@ -6,6 +7,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 
 import MelodiMusicDashboard from "./pages/MelodiMusicDashboard";
+import Music from './pages/Music';
 import Search from "./pages/search";
 import Library from "./pages/library";
 import LikedSongs from "./pages/likedSongs";
@@ -37,7 +39,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-
+          <Route path="/music" element={<Music />} />
           <Route
             path="/"
             element={
