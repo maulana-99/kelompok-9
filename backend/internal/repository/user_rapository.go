@@ -17,6 +17,10 @@ type UserRepository interface {
 
 	GetFollowers(userID int) ([]model.User, error)
 	GetFollowing(userID int) ([]model.User, error)
+
+	Follow(followerID int, followingID int) error
+	Unfollow(followerID int, followingID int) error
+	IsFollowing(followerID int, followingID int) (bool, error)
 	
 }
 
@@ -92,6 +96,22 @@ func (r *userRepository) GetFollowing(userID int) ([]model.User, error) {
 	}
 	return following, nil
 }
+
+// Implementasi fungsinya
+func (r *userRepository) Follow(followerID int, followingID int) error {
+	return r.db.Exec("INSERT INTO follow (follower_id, following_id) VALUES (?, ?) ON CONFLICT DO NOTHING", followerID, followingID).Error
+}
+
+func (r *userRepository) Unfollow(followerID int, followingID int) error {
+	return r.db.Exec("DELETE FROM follow WHERE follower_id = ? AND following_id = ?", followerID, followingID).Error
+}
+
+func (r *userRepository) IsFollowing(followerID int, followingID int) (bool, error) {
+	var count int64
+	err := r.db.Table("follow").Where("follower_id = ? AND following_id = ?", followerID, followingID).Count(&count).Error
+	return count > 0, err
+}
+
 // escapeLike escapes LIKE wildcards so user input is matched literally.
 func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(s)
