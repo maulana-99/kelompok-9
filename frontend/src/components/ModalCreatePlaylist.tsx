@@ -1,26 +1,28 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Pencil, ImagePlus, ListMusic, Search, Check } from 'lucide-react';
 import { cx, initialsOf, toSeconds, toDurationLabel } from '../lib/utils';
-import { tracks as allTracks } from '../data/mock';
-import type { CreatePlaylistInput } from '../types';
+import type { CreatePlaylistInput, Track } from '../types';
 
 const COLS = 'grid grid-cols-12 items-center';
 
 interface ModalCreatePlaylistProps {
+  tracks: Track[];
   onClose: () => void;
-  onCreate: (playlist: CreatePlaylistInput) => void;
+  onCreate: (playlist: CreatePlaylistInput) => Promise<void>;
 }
 
 /**
  * Create Playlist sebagai modal overlay.
  * Isi mengikuti frame "Create Playlist": header form, empty state + search, dan daftar Recommended.
  */
-export default function ModalCreatePlaylist({ onClose, onCreate }: ModalCreatePlaylistProps) {
+export default function ModalCreatePlaylist({ tracks, onClose, onCreate }: ModalCreatePlaylistProps) {
   const [name, setName] = useState('New Playlist');
   const [description, setDescription] = useState('');
   const [cover, setCover] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [addedIds, setAddedIds] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -39,19 +41,14 @@ export default function ModalCreatePlaylist({ onClose, onCreate }: ModalCreatePl
     };
   }, [onClose]);
 
-  useEffect(() => {
-    if (!cover) return undefined;
-    return () => URL.revokeObjectURL(cover);
-  }, [cover]);
-
   const recommended = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const pool = allTracks.slice(0, 5);
+    const pool = tracks.slice(0, 5);
     if (!q) return pool;
-    return allTracks.filter((t) => `${t.title} ${t.artist} ${t.album}`.toLowerCase().includes(q));
-  }, [query]);
+    return tracks.filter((t) => `${t.title} ${t.artist} ${t.album}`.toLowerCase().includes(q));
+  }, [query, tracks]);
 
-  const addedTracks = allTracks.filter((t) => addedIds.includes(t.id));
+  const addedTracks = addedIds.map((id) => tracks.find((track) => track.id === id)).filter((track): track is Track => track !== undefined);
   const totalSeconds = addedTracks.reduce((sum, t) => sum + toSeconds(t.duration), 0);
 
   const toggle = (id: string) =>
@@ -60,17 +57,30 @@ export default function ModalCreatePlaylist({ onClose, onCreate }: ModalCreatePl
   const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (cover) URL.revokeObjectURL(cover);
-    setCover(URL.createObjectURL(file));
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setCover(reader.result);
+    };
+    reader.onerror = () => setError('Unable to read the selected cover image.');
+    reader.readAsDataURL(file);
   };
 
-  const submit = () =>
-    onCreate({
-      name: name.trim() || 'New Playlist',
-      description: description.trim(),
-      trackIds: addedIds,
-      cover,
-    });
+  const submit = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      await onCreate({
+        name: name.trim() || 'New Playlist',
+        description: description.trim(),
+        trackIds: addedIds,
+        cover,
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to create playlist.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div
@@ -144,12 +154,14 @@ export default function ModalCreatePlaylist({ onClose, onCreate }: ModalCreatePl
                   <button
                     type="button"
                     onClick={submit}
-                    className="bg-primary px-6 py-2 text-[12px] font-bold uppercase leading-4 tracking-[0.6px] text-on-primary transition hover:brightness-110"
+                    disabled={submitting}
+                    className="bg-primary px-6 py-2 text-[12px] font-bold uppercase leading-4 tracking-[0.6px] text-on-primary transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60"
                   >
-                    CREATE PLAYLIST
+                    {submitting ? 'SAVING...' : 'CREATE PLAYLIST'}
                   </button>
                 </div>
               </div>
+              {error && <p role="alert" className="pt-3 text-right text-[12px] text-primary-soft">{error}</p>}
             </div>
           </section>
 

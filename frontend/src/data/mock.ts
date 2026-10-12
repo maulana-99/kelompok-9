@@ -78,6 +78,11 @@ export const relevantPlaylists = [
   { id: 'r1', kind: 'wave', badge: 'COLLECTION', title: 'Frank Ocean Essentials', subtitle: 'By Melodi' },
   { id: 'r2', kind: 'text', big: 'B // CO', small: '2012-2016', title: 'Blonde & Channel Orange', subtitle: 'Complete discography' },
   { id: 'r3', kind: 'icon', small: 'R&B VIBES', title: 'Late Night R&B Vibe', subtitle: 'Ocean & Contemporaries' },
+  { id: 'r4', kind: 'wave', badge: 'RADIO', title: 'Frank Ocean Radio', subtitle: 'Endless mixes & deep cuts' },
+  { id: 'r5', kind: 'text', big: 'NOSTALGIA', small: 'ULTRA', title: 'nostalgia, ULTRA & Singles', subtitle: 'Mixtape era highlights' },
+  { id: 'r6', kind: 'icon', small: 'CHILL', title: 'Midsummer Introspection', subtitle: 'Soul, alternative & chill' },
+  { id: 'r7', kind: 'wave', badge: 'SPOTLIGHT', title: "Boys Don't Cry Magazine", subtitle: 'Soundtrack & influences' },
+  { id: 'r8', kind: 'text', big: 'BLONDED', small: 'BEATS 1', title: 'blonded RADIO Archive', subtitle: 'Curated radio episodes' },
 ];
 
 export const people = [

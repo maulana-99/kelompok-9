@@ -40,11 +40,16 @@ func New(db *gorm.DB) *gin.Engine {
 			users.POST("", userHandler.Create)
 			users.GET("", userHandler.GetAll)
 			users.GET("/:id", userHandler.GetByID)
+			users.GET("/:id/followers", userHandler.GetFollowers)
+			users.GET("/:id/following", userHandler.GetFollowing)
+			users.POST("/:id/follow", requireAuth, userHandler.Follow)
+			users.DELETE("/:id/follow", requireAuth, userHandler.Unfollow)
+			users.PUT("/:id", requireAuth, userHandler.Update)
+			users.DELETE("/:id", requireAuth, userHandler.Delete)
+		}
 
-		// --- Wiring dependency for the music resource (scraping YouTube Music and no local tables) ---
 		musicService := service.NewMusicService()
 		musicHandler := handler.NewMusicHandler(musicService)
-
 		music := v1.Group("/music")
 		{
 			music.GET("/search", musicHandler.Search)
@@ -52,23 +57,13 @@ func New(db *gorm.DB) *gin.Engine {
 			music.GET("/:musicId/stream", musicHandler.Stream)
 		}
 
-		// Tambahkan resource lain di sini, contoh:
-		// products := v1.Group("/products")
-		// {
-		// 	products.GET("", productHandler.GetAll)
-		// 	...
-		// }
-			// Endpoint tambahan followers & following
-			users.GET("/:id/followers", userHandler.GetFollowers)
-			users.GET("/:id/following", userHandler.GetFollowing)
-			
-			// Endpoint follow & unfollow (butuh login)
-			users.POST("/:id/follow", requireAuth, userHandler.Follow)
-			users.DELETE("/:id/follow", requireAuth, userHandler.Unfollow)
-
-			// Menggunakan requireAuth untuk update dan delete
-			users.PUT("/:id", requireAuth, userHandler.Update)
-			users.DELETE("/:id", requireAuth, userHandler.Delete)
+		playlistService := service.NewPlaylistService(repository.NewPlaylistRepository(db))
+		playlistHandler := handler.NewPlaylistHandler(playlistService)
+		playlists := v1.Group("/playlists", requireAuth)
+		{
+			playlists.GET("", playlistHandler.List)
+			playlists.GET("/:id", playlistHandler.Get)
+			playlists.POST("", playlistHandler.Create)
 		}
 	}
 

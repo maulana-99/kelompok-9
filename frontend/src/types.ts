@@ -77,6 +77,17 @@ export interface CreatePlaylistInput {
   cover: string | null;
 }
 
+export interface BackendPlaylist {
+  id: string;
+  name: string;
+  description: string;
+  cover: string | null;
+  track_count: number;
+  duration_label: string;
+  track_ids: string[];
+  tracks: Track[];
+}
+
 export interface AppUser {
   id?: number;
   name: string;
@@ -86,7 +97,7 @@ export interface AppUser {
   created_at?: string;
 }
 
-export type AppView = 'login' | 'home' | 'search' | 'playlist';
+export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library';
 
 export interface NavigationEntry {
   view: AppView;
@@ -100,7 +111,7 @@ export interface AppContext {
   setQuery: (value: string) => void;
   playlists: Playlist[];
   activePlaylistId: string | null;
-  navigate: (target: 'home' | 'search') => void;
+  navigate: (target: 'home' | 'search' | 'library') => void;
   openPlaylist: (id: string) => void;
   openCreate: () => void;
   logout: () => void;

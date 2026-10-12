@@ -9,12 +9,13 @@ const inputClass =
 
 interface LoginViewProps {
   defaultUsername: string;
-  onLogin: (user: AppUser) => void;
+  defaultMode?: 'login' | 'signup';
+  onLogin: (user: AppUser) => Promise<void>;
 }
 
 /** Login View (frame "Login"). Tab Log In / Sign Up berpindah tanpa halaman baru. */
-export default function LoginView({ defaultUsername, onLogin }: LoginViewProps) {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+export default function LoginView({ defaultUsername, defaultMode = 'login', onLogin }: LoginViewProps) {
+  const [mode, setMode] = useState<'login' | 'signup'>(defaultMode);
   const [name, setName] = useState('');
   const [username, setUsername] = useState(defaultUsername);
   const [password, setPassword] = useState('');
@@ -36,7 +37,7 @@ export default function LoginView({ defaultUsername, onLogin }: LoginViewProps) 
         await createUser({ name: name.trim(), username: username.trim(), password });
       }
       const auth = await login({ username: username.trim(), password });
-      onLogin({
+      await onLogin({
         ...auth.user,
         handle: `@${auth.user.username}`,
         plan: 'Free Plan',

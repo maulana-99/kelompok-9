@@ -11,7 +11,7 @@ interface SidebarProps {
   activePlaylistId: string | null;
   user: AppUser;
   footerHeight: number;
-  onNavigate: (target: 'home' | 'search') => void;
+  onNavigate: (target: 'home' | 'search' | 'library') => void;
   onOpenPlaylist: (id: string) => void;
   onCreatePlaylist: () => void;
   onLogout: () => void;
@@ -39,7 +39,7 @@ export default function Sidebar({
   const navItems = [
     { key: 'home', label: 'Home', icon: Home, target: 'home' },
     { key: 'search', label: 'Search', icon: Search, target: 'search' },
-    { key: 'library', label: 'Your Library', icon: Library, target: null },
+    { key: 'library', label: 'Your Library', icon: Library, target: 'library' },
     { key: 'history', label: 'History', icon: History, target: null },
   ] as const;
 

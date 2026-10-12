@@ -3,9 +3,12 @@ import type {
   ApiSuccess,
   AuthResponse,
   BackendUser,
+  BackendPlaylist,
   CreateUserRequest,
+  CreatePlaylistInput,
   LoginRequest,
   MusicSearchResult,
+  Track,
 } from '../types';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api/v1').replace(/\/$/, '');
@@ -76,11 +79,40 @@ export async function logout(): Promise<null> {
   }
 }
 
+export async function getMe(): Promise<BackendUser> {
+  const user = await apiRequest<BackendUser>('/auth/me');
+  if (!user) throw new ApiError('Backend did not return current user profile.', 401);
+  return user;
+}
+
 export async function searchMusic(query: string, limit = 20): Promise<MusicSearchResult[]> {
   const params = new URLSearchParams({ q: query, limit: String(limit) });
   const results = await apiRequest<MusicSearchResult[]>(`/music/search?${params.toString()}`);
   if (!results) throw new ApiError('Backend did not return search results.', 500);
   return results;
+}
+
+export async function listPlaylists(): Promise<BackendPlaylist[]> {
+  const playlists = await apiRequest<BackendPlaylist[]>('/playlists');
+  if (!playlists) throw new ApiError('Backend did not return playlists.', 500);
+  return playlists;
+}
+
+export async function createPlaylist(input: CreatePlaylistInput, tracks: Track[]): Promise<BackendPlaylist> {
+  const selectedTracks = input.trackIds.map((id) => tracks.find((track) => track.id === id)).filter(
+    (track): track is Track => track !== undefined,
+  );
+  const playlist = await apiRequest<BackendPlaylist>('/playlists', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: input.name,
+      description: input.description,
+      cover: input.cover,
+      tracks: selectedTracks,
+    }),
+  });
+  if (!playlist) throw new ApiError('Backend did not return the created playlist.', 500);
+  return playlist;
 }
 
 export function hasAuthToken(): boolean {

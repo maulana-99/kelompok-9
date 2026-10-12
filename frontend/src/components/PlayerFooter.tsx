@@ -54,7 +54,7 @@ export default function PlayerFooter({
   const volRef = useRef<HTMLDivElement>(null);
 
   const handleBar =
-    (ref: RefObject<HTMLDivElement>, cb: (value: number) => void) =>
+    (ref: RefObject<HTMLDivElement | null>, cb: (value: number) => void) =>
     (e: MouseEvent<HTMLDivElement>) => {
       const element = ref.current;
       if (!element) return;

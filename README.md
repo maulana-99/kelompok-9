@@ -337,6 +337,23 @@ Semua response memakai format seragam:
 
 Endpoint ber-auth butuh header `Authorization: Bearer <token>`. Tanpa token valid → `401 belum login`.
 
+### Playlist dan pencarian musik
+
+| Method | Endpoint | Auth | Keterangan |
+|---|---|---|---|
+| GET | `/api/v1/music/search?q=&limit=` | – | pencarian lagu untuk halaman Search |
+| GET | `/api/v1/music/:musicId/stream` | – | stream audio |
+| GET | `/api/v1/music/thumb?url=` | – | proxy thumbnail |
+| GET | `/api/v1/playlists` | Ya | daftar playlist milik user login |
+| GET | `/api/v1/playlists/:id` | Ya | detail playlist milik user login |
+| POST | `/api/v1/playlists` | Ya | simpan playlist dan lagu pilihan |
+
+`POST /api/v1/playlists` menerima `name`, `description`, `cover`, dan `tracks`.
+Setiap track memakai `id`, `title`, `artist`, `album`, `duration`, `explicit`,
+`added`, `videoId`, dan `thumbnail` seperti data frontend. Response playlist
+memuat `track_ids`, `tracks`, `track_count`, dan `duration_label`. Playlist hanya
+bisa dibaca oleh pemilik akun; ID playlist dapat dikirim sebagai `p<ID>` atau angka.
+
 ### POST /api/v1/users
 
 Body:
