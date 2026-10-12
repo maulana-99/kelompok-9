@@ -1,11 +1,28 @@
 import { Clock, Music, Heart } from 'lucide-react';
 import { cx } from '../lib/utils';
 import Equalizer from './Equalizer';
+import type { Track } from '../types';
 
 const COLS = 'grid grid-cols-[62px_minmax(0,1fr)_220px_141px_62px] items-center gap-4';
 
+interface TrackListProps {
+  tracks: Track[];
+  currentTrackId: string;
+  isPlaying: boolean;
+  likedIds: string[];
+  onPlay: (id: string) => void;
+  onToggleLike: (id: string) => void;
+}
+
 /** Tabel tracklist di Playlist Preview. */
-export default function TrackList({ tracks, currentTrackId, isPlaying, likedIds, onPlay, onToggleLike }) {
+export default function TrackList({
+  tracks,
+  currentTrackId,
+  isPlaying,
+  likedIds,
+  onPlay,
+  onToggleLike,
+}: TrackListProps) {
   return (
     <div className="px-8">
       <div className={cx(COLS, 'px-4 py-[10px] text-[11px] font-semibold uppercase leading-4 tracking-[0.55px] text-muted')}>

@@ -1,11 +1,28 @@
 import { Music, Heart } from 'lucide-react';
 import { cx } from '../lib/utils';
 import Equalizer from './Equalizer';
+import type { Track } from '../types';
 
 const COLS = 'grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_80px_40px] items-center';
 
+interface SearchSongsTableProps {
+  tracks: Track[];
+  currentTrackId: string;
+  isPlaying: boolean;
+  likedIds: string[];
+  onPlay: (id: string) => void;
+  onToggleLike: (id: string) => void;
+}
+
 /** Tabel "SONGS" pada hasil pencarian. */
-export default function SearchSongsTable({ tracks, currentTrackId, isPlaying, likedIds, onPlay, onToggleLike }) {
+export default function SearchSongsTable({
+  tracks,
+  currentTrackId,
+  isPlaying,
+  likedIds,
+  onPlay,
+  onToggleLike,
+}: SearchSongsTableProps) {
   return (
     <div className="overflow-hidden border border-line/50 bg-sunken/60">
       <div className={cx(COLS, 'bg-card/90 px-5 py-3 text-[11px] font-semibold uppercase leading-4 tracking-[0.55px] text-muted')}>

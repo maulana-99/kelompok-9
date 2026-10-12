@@ -1,13 +1,14 @@
 // Mock data — isi teks mengikuti yang ada di desain Figma.
+import type { AppUser, Playlist, Track } from '../types';
 
-export const currentUser = {
-  name: 'Zeika',
-  handle: '@zeika',
-  email: 'zeika@melodi.audio',
+export const currentUser: AppUser = {
+  name: '',
+  username: '',
+  handle: '',
   plan: 'Free Plan',
 };
 
-export const tracks = [
+export const tracks: Track[] = [
   { id: 't1', title: 'Nights', artist: 'Frank Ocean', album: 'Blonde', duration: '5:07', explicit: true, added: '5 days ago' },
   { id: 't2', title: 'After Dark', artist: 'Mr.Kitty', album: 'Time', duration: '4:18', explicit: false, added: '1 week ago' },
   { id: 't3', title: 'Blinding Lights', artist: 'The Weeknd', album: 'After Hours', duration: '3:20', explicit: false, added: '2 weeks ago' },
@@ -22,9 +23,9 @@ export const tracks = [
   { id: 't12', title: 'Sanctuary', artist: 'Joji', album: 'Nectar', duration: '3:00', explicit: false, added: '3 months ago' },
 ];
 
-export const getTrack = (id) => tracks.find((t) => t.id === id);
+export const getTrack = (id: string): Track | undefined => tracks.find((t) => t.id === id);
 
-export const playlists = [
+export const playlists: Playlist[] = [
   {
     id: 'p1',
     name: 'Late Night Drive',

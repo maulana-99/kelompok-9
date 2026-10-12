@@ -1,11 +1,15 @@
 import { Play, Pause, Heart, Download, MoreHorizontal, ListMusic } from 'lucide-react';
 import { cx, toDurationLabel, toSeconds } from '../lib/utils';
-import { getTrack } from '../data/mock';
 import TrackList from '../components/TrackList';
+import type { Playlist, Track } from '../types';
 
 const BARS = ['h-3', 'h-6', 'h-9', 'h-4', 'h-7', 'h-2', 'h-5'];
 
-function Cover({ playlist }) {
+interface CoverProps {
+  playlist: Playlist;
+}
+
+function Cover({ playlist }: CoverProps) {
   const meta = playlist.meta;
   if (playlist.cover) {
     return <img src={playlist.cover} alt={`${playlist.name} cover`} className="size-56 shrink-0 object-cover shadow-card" />;
@@ -40,8 +44,30 @@ function Cover({ playlist }) {
 }
 
 /** Playlist Preview View. */
-export default function PlaylistView({ playlist, currentTrackId, isPlaying, likedIds, onPlayTrack, onToggleLike, onTogglePlay }) {
-  const list = playlist.trackIds.map(getTrack).filter(Boolean);
+interface PlaylistViewProps {
+  playlist: Playlist;
+  tracks: Track[];
+  currentTrackId: string;
+  isPlaying: boolean;
+  likedIds: string[];
+  onPlayTrack: (id: string) => void;
+  onToggleLike: (id: string) => void;
+  onTogglePlay: () => void;
+}
+
+export default function PlaylistView({
+  playlist,
+  tracks,
+  currentTrackId,
+  isPlaying,
+  likedIds,
+  onPlayTrack,
+  onToggleLike,
+  onTogglePlay,
+}: PlaylistViewProps) {
+  const list = playlist.trackIds
+    .map((id) => tracks.find((track) => track.id === id))
+    .filter((track): track is Track => track !== undefined);
   const count = playlist.trackCount ?? list.length;
   const duration =
     playlist.durationLabel ?? toDurationLabel(list.reduce((s, t) => s + toSeconds(t.duration), 0));

@@ -1,26 +1,34 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Pencil, ImagePlus, ListMusic, Search, Check } from 'lucide-react';
-import { cx, initialsOf, toClock, toSeconds, toDurationLabel } from '../lib/utils';
+import { cx, initialsOf, toSeconds, toDurationLabel } from '../lib/utils';
 import { tracks as allTracks } from '../data/mock';
+import type { CreatePlaylistInput } from '../types';
 
 const COLS = 'grid grid-cols-12 items-center';
+
+interface ModalCreatePlaylistProps {
+  onClose: () => void;
+  onCreate: (playlist: CreatePlaylistInput) => void;
+}
 
 /**
  * Create Playlist sebagai modal overlay.
  * Isi mengikuti frame "Create Playlist": header form, empty state + search, dan daftar Recommended.
  */
-export default function ModalCreatePlaylist({ onClose, onCreate }) {
+export default function ModalCreatePlaylist({ onClose, onCreate }: ModalCreatePlaylistProps) {
   const [name, setName] = useState('New Playlist');
   const [description, setDescription] = useState('');
-  const [cover, setCover] = useState(null);
+  const [cover, setCover] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [addedIds, setAddedIds] = useState([]);
-  const fileRef = useRef(null);
-  const panelRef = useRef(null);
+  const [addedIds, setAddedIds] = useState<string[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // Tutup dengan Esc + kunci scroll body
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -31,7 +39,10 @@ export default function ModalCreatePlaylist({ onClose, onCreate }) {
     };
   }, [onClose]);
 
-  useEffect(() => () => cover && URL.revokeObjectURL(cover), [cover]);
+  useEffect(() => {
+    if (!cover) return undefined;
+    return () => URL.revokeObjectURL(cover);
+  }, [cover]);
 
   const recommended = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -43,9 +54,10 @@ export default function ModalCreatePlaylist({ onClose, onCreate }) {
   const addedTracks = allTracks.filter((t) => addedIds.includes(t.id));
   const totalSeconds = addedTracks.reduce((sum, t) => sum + toSeconds(t.duration), 0);
 
-  const toggle = (id) => setAddedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  const toggle = (id: string) =>
+    setAddedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
 
-  const handleFile = (e) => {
+  const handleFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (cover) URL.revokeObjectURL(cover);

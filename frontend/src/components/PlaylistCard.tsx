@@ -1,7 +1,13 @@
 import { ListMusic } from 'lucide-react';
+import type { Playlist } from '../types';
+
+interface PlaylistCardProps {
+  playlist: Playlist;
+  onOpen: (id: string) => void;
+}
 
 /** Kartu playlist di Home (cover placeholder + judul + info). */
-export default function PlaylistCard({ playlist, onOpen }) {
+export default function PlaylistCard({ playlist, onOpen }: PlaylistCardProps) {
   const count = playlist.trackCount ?? playlist.trackIds.length;
   return (
     <button

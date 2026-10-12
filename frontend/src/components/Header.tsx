@@ -1,5 +1,18 @@
 import { ChevronLeft, ChevronRight, Search, X, Download } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { cx } from '../lib/utils';
+
+interface HeaderProps {
+  variant?: 'base' | 'dash';
+  query: string;
+  onQueryChange: (value: string) => void;
+  onBack: () => void;
+  onForward: () => void;
+  canBack: boolean;
+  canForward: boolean;
+  rightSlot?: ReactNode;
+  autoFocus?: boolean;
+}
 
 /** Top header: tombol back/forward + search bar + aksi kanan. */
 export default function Header({
@@ -12,7 +25,7 @@ export default function Header({
   canForward,
   rightSlot,
   autoFocus = false,
-}) {
+}: HeaderProps) {
   const dash = variant === 'dash';
 
   return (

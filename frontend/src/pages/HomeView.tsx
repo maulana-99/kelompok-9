@@ -1,12 +1,29 @@
-import { LayoutGrid, List, Plus } from 'lucide-react';
+import { LayoutGrid, Plus } from 'lucide-react';
 import SectionHeading from '../components/SectionHeading';
 import RecentTrackList from '../components/RecentTrackList';
 import PlaylistCard from '../components/PlaylistCard';
 import ArtistCard from '../components/ArtistCard';
 import { recentlyPlayed, topArtists } from '../data/mock';
+import type { Playlist } from '../types';
+
+interface HomeViewProps {
+  playlists: Playlist[];
+  currentTrackId: string;
+  isPlaying: boolean;
+  onPlayTrack: (id: string) => void;
+  onOpenPlaylist: (id: string) => void;
+  onCreatePlaylist: () => void;
+}
 
 /** Home/Dashboard View. */
-export default function HomeView({ playlists, currentTrackId, isPlaying, onPlayTrack, onOpenPlaylist, onCreatePlaylist }) {
+export default function HomeView({
+  playlists,
+  currentTrackId,
+  isPlaying,
+  onPlayTrack,
+  onOpenPlaylist,
+  onCreatePlaylist,
+}: HomeViewProps) {
   return (
     <div className="mx-auto flex max-w-[1280px] flex-col gap-10 p-8">
       <section>

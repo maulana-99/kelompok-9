@@ -1,7 +1,24 @@
 import { cx } from '../lib/utils';
+import type { ReactNode } from 'react';
+
+interface SectionHeadingProps {
+  title: string;
+  action?: string;
+  onAction?: () => void;
+  variant?: 'dash' | 'base';
+  className?: string;
+  children?: ReactNode;
+}
 
 /** Judul section (mis. "Recently Played" + link "See all"). */
-export default function SectionHeading({ title, action, onAction, variant = 'dash', className = '', children }) {
+export default function SectionHeading({
+  title,
+  action,
+  onAction,
+  variant = 'dash',
+  className = '',
+  children,
+}: SectionHeadingProps) {
   const dash = variant === 'dash';
   return (
     <div className={cx('flex items-center justify-between pb-4', className)}>

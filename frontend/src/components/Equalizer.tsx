@@ -1,7 +1,17 @@
 import { cx } from '../lib/utils';
 
+interface EqualizerProps {
+  playing?: boolean;
+  className?: string;
+  barClass?: string;
+}
+
 /** Bar animasi "sedang diputar" (3 batang), seperti di desain. */
-export default function Equalizer({ playing = true, className = '', barClass = 'bg-primary' }) {
+export default function Equalizer({
+  playing = true,
+  className = '',
+  barClass = 'bg-primary',
+}: EqualizerProps) {
   const heights = ['h-[12px]', 'h-[8px]', 'h-[12px]'];
   return (
     <div className={cx('flex items-end gap-[3px] h-[12px]', className)} aria-hidden="true">

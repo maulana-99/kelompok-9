@@ -1,6 +1,21 @@
 import { Home, Search, Library, History, Plus, Users, Settings, LogOut, User } from 'lucide-react';
 import { cx } from '../lib/utils';
 import { friendActivity } from '../data/mock';
+import type { AppUser, AppView, Playlist } from '../types';
+
+interface SidebarProps {
+  variant?: 'base' | 'dash';
+  navLabel?: string;
+  view: AppView;
+  playlists: Playlist[];
+  activePlaylistId: string | null;
+  user: AppUser;
+  footerHeight: number;
+  onNavigate: (target: 'home' | 'search') => void;
+  onOpenPlaylist: (id: string) => void;
+  onCreatePlaylist: () => void;
+  onLogout: () => void;
+}
 
 /**
  * Sidebar kiri. `variant="dash"` = palet frame Home/Dashboard,
@@ -18,7 +33,7 @@ export default function Sidebar({
   onOpenPlaylist,
   onCreatePlaylist,
   onLogout,
-}) {
+}: SidebarProps) {
   const dash = variant === 'dash';
 
   const navItems = [
@@ -26,7 +41,7 @@ export default function Sidebar({
     { key: 'search', label: 'Search', icon: Search, target: 'search' },
     { key: 'library', label: 'Your Library', icon: Library, target: null },
     { key: 'history', label: 'History', icon: History, target: null },
-  ];
+  ] as const;
 
   const sectionLabel = dash
     ? 'text-[12px] font-semibold text-dash-muted'

@@ -2,13 +2,27 @@ import { Music, MoreVertical } from 'lucide-react';
 import { cx } from '../lib/utils';
 import { getTrack } from '../data/mock';
 import Equalizer from './Equalizer';
+import type { recentlyPlayed } from '../data/mock';
+
+interface RecentTrackListProps {
+  items: typeof recentlyPlayed;
+  currentTrackId: string;
+  isPlaying: boolean;
+  onPlay: (id: string) => void;
+}
 
 /** Daftar "Recently Played" pada Home (baris aktif punya badge "Playing"). */
-export default function RecentTrackList({ items, currentTrackId, isPlaying, onPlay }) {
+export default function RecentTrackList({
+  items,
+  currentTrackId,
+  isPlaying,
+  onPlay,
+}: RecentTrackListProps) {
   return (
     <div className="flex flex-col border border-dash-line/40 bg-dash-card p-[9px]">
       {items.map((item, i) => {
         const track = getTrack(item.trackId);
+        if (!track) return null;
         const active = track.id === currentTrackId;
         return (
           <div

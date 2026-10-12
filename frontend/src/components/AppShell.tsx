@@ -1,13 +1,31 @@
+import type { ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import PlayerFooter from './PlayerFooter';
 import { cx } from '../lib/utils';
+import type { AppContext } from '../types';
+
+interface AppShellProps {
+  variant?: 'base' | 'dash';
+  navLabel?: string;
+  children: ReactNode;
+  app: AppContext;
+  headerRight?: ReactNode;
+  autoFocusSearch?: boolean;
+}
 
 /**
  * Kerangka halaman setelah login: Sidebar + Header + konten + Player bar.
- * Semua state diterima dari App (lihat App.jsx).
+ * Semua state diterima dari App.
  */
-export default function AppShell({ variant = 'base', navLabel, children, app, headerRight, autoFocusSearch }) {
+export default function AppShell({
+  variant = 'base',
+  navLabel,
+  children,
+  app,
+  headerRight,
+  autoFocusSearch,
+}: AppShellProps) {
   const dash = variant === 'dash';
   const footerHeight = dash ? 72 : 76;
 

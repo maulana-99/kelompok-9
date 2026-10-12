@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type MouseEvent, type RefObject } from 'react';
 import {
   Music,
   Heart,
@@ -14,6 +14,22 @@ import {
   Volume2,
 } from 'lucide-react';
 import { cx, toClock, toSeconds } from '../lib/utils';
+import type { Track } from '../types';
+
+interface PlayerFooterProps {
+  variant?: 'base' | 'dash';
+  track: Track;
+  isPlaying: boolean;
+  progress: number;
+  volume: number;
+  liked: boolean;
+  onToggleLike: () => void;
+  onTogglePlay: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onSeek: (seconds: number) => void;
+  onVolume: (volume: number) => void;
+}
 
 /** Bottom player bar (persisten di semua halaman setelah login). */
 export default function PlayerFooter({
@@ -29,18 +45,23 @@ export default function PlayerFooter({
   onNext,
   onSeek,
   onVolume,
-}) {
+}: PlayerFooterProps) {
   const dash = variant === 'dash';
   const total = toSeconds(track.duration);
   const percent = total ? Math.min(100, (progress / total) * 100) : 0;
 
-  const scrubRef = useRef(null);
-  const volRef = useRef(null);
+  const scrubRef = useRef<HTMLDivElement>(null);
+  const volRef = useRef<HTMLDivElement>(null);
 
-  const handleBar = (ref, cb) => (e) => {
-    const rect = ref.current.getBoundingClientRect();
-    cb(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)));
-  };
+  const handleBar =
+    (ref: RefObject<HTMLDivElement>, cb: (value: number) => void) =>
+    (e: MouseEvent<HTMLDivElement>) => {
+      const element = ref.current;
+      if (!element) return;
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0) return;
+      cb(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)));
+    };
 
   const ghostBtn = cx('p-1 transition-colors hover:text-primary', dash ? 'text-dash-dim' : 'text-muted');
 

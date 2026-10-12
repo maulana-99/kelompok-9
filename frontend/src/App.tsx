@@ -5,8 +5,10 @@ import LoginView from './pages/LoginView';
 import HomeView from './pages/HomeView';
 import SearchView from './pages/SearchView';
 import PlaylistView from './pages/PlaylistView';
-import { currentUser, getTrack, playlists as seedPlaylists, tracks } from './data/mock';
-import { toSeconds } from './lib/utils';
+import { currentUser, playlists as seedPlaylists, tracks } from './data/mock';
+import { clearAuthToken, logout as logoutApi } from './lib/api';
+import { toDurationLabel, toSeconds } from './lib/utils';
+import type { AppContext, AppUser, CreatePlaylistInput, NavigationEntry, Playlist, Track } from './types';
 
 /**
  * State sederhana tanpa router:
@@ -16,10 +18,11 @@ import { toSeconds } from './lib/utils';
  */
 export default function App() {
   const [user, setUser] = useState(currentUser);
-  const [history, setHistory] = useState([{ view: 'login' }]);
+  const [history, setHistory] = useState<NavigationEntry[]>([{ view: 'login' }]);
   const [cursor, setCursor] = useState(0);
   const [query, setQueryState] = useState('');
   const [playlists, setPlaylists] = useState(seedPlaylists);
+  const [knownTracks, setKnownTracks] = useState<Track[]>(tracks);
   const [showCreate, setShowCreate] = useState(false);
 
   // Player
@@ -32,46 +35,50 @@ export default function App() {
   const current = history[cursor];
   const view = current.view;
   const activePlaylistId = current.playlistId ?? null;
-  const currentTrack = getTrack(currentTrackId);
+  const currentTrack = knownTracks.find((track) => track.id === currentTrackId) ?? tracks[0];
 
   // ---- navigasi ----
   const go = useCallback(
-    (next) => {
+    (next: NavigationEntry) => {
       setHistory((h) => [...h.slice(0, cursor + 1), next]);
       setCursor((c) => c + 1);
     },
     [cursor],
   );
 
-  const navigate = (target) => {
+  const navigate = (target: 'home' | 'search') => {
     if (target === 'home') setQueryState('');
     if (target === 'search' && !query) setQueryState('Frank Ocean');
     go({ view: target });
   };
 
-  const openPlaylist = (id) => go({ view: 'playlist', playlistId: id });
+  const openPlaylist = (id: string) => go({ view: 'playlist', playlistId: id });
 
   // Mengetik di search bar otomatis membuka halaman hasil pencarian.
-  const setQuery = (value) => {
+  const setQuery = (value: string) => {
     setQueryState(value);
     if (value && view !== 'search') go({ view: 'search' });
     if (!value && view === 'search') go({ view: 'home' });
   };
 
-  const login = ({ name }) => {
-    if (name) setUser((u) => ({ ...u, name }));
+  const login = (authenticatedUser: AppUser) => {
+    setUser(authenticatedUser);
     setHistory([{ view: 'home' }]);
     setCursor(0);
   };
 
   const logout = () => {
+    void logoutApi().catch((error: unknown) => {
+      console.error('Unable to log out from the backend:', error);
+    });
+    clearAuthToken();
     setQueryState('');
     setHistory([{ view: 'login' }]);
     setCursor(0);
   };
 
   // ---- player ----
-  const playTrack = (id) => {
+  const playTrack = (id: string) => {
     if (id === currentTrackId) {
       setIsPlaying((p) => !p);
     } else {
@@ -81,15 +88,24 @@ export default function App() {
     }
   };
 
-  const step = (dir) => {
-    const i = tracks.findIndex((t) => t.id === currentTrackId);
-    const next = tracks[(i + dir + tracks.length) % tracks.length];
+  const step = (dir: number) => {
+    const i = knownTracks.findIndex((t) => t.id === currentTrackId);
+    const nextIndex = (Math.max(i, 0) + dir + knownTracks.length) % knownTracks.length;
+    const next = knownTracks[nextIndex];
     setCurrentTrackId(next.id);
     setProgress(0);
     setIsPlaying(true);
   };
 
-  const toggleLike = (id) => setLikedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  const toggleLike = (id: string) => setLikedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+
+  const rememberTracks = useCallback((results: Track[]) => {
+    setKnownTracks((existing) => {
+      const byId = new Map(existing.map((track) => [track.id, track]));
+      results.forEach((track) => byId.set(track.id, track));
+      return [...byId.values()];
+    });
+  }, []);
 
   // Timer progres lagu; lanjut ke lagu berikutnya saat selesai.
   useEffect(() => {
@@ -109,17 +125,27 @@ export default function App() {
   }, [isPlaying, currentTrackId, view]);
 
   // ---- create playlist ----
-  const createPlaylist = ({ name, description, trackIds, cover }) => {
+  const createPlaylist = ({ name, description, trackIds, cover }: CreatePlaylistInput) => {
     const id = `p${Date.now()}`;
-    const total = trackIds.reduce((sum, tid) => sum + toSeconds(getTrack(tid).duration), 0);
-    const mins = Math.round(total / 60);
-    const durationLabel = mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} hr ${String(mins % 60).padStart(2, '0')} min`;
-    setPlaylists((list) => [...list, { id, name, description, trackIds, cover, trackCount: trackIds.length, durationLabel: total ? durationLabel : '0 min' }]);
+    const total = trackIds.reduce((sum, tid) => {
+      const track = knownTracks.find((item) => item.id === tid);
+      return sum + (track ? toSeconds(track.duration) : 0);
+    }, 0);
+    const newPlaylist: Playlist = {
+      id,
+      name,
+      description,
+      trackIds,
+      cover,
+      trackCount: trackIds.length,
+      durationLabel: total ? toDurationLabel(total) : '0 min',
+    };
+    setPlaylists((list) => [...list, newPlaylist]);
     setShowCreate(false);
     openPlaylist(id);
   };
 
-  const app = useMemo(
+  const app: AppContext = useMemo(
     () => ({
       view,
       user,
@@ -153,7 +179,7 @@ export default function App() {
 
   // ---- render ----
   if (view === 'login') {
-    return <LoginView defaultEmail={user.email} onLogin={login} />;
+    return <LoginView defaultUsername={user.username} onLogin={login} />;
   }
 
   const playlist = playlists.find((p) => p.id === activePlaylistId) ?? playlists[0];
@@ -182,6 +208,7 @@ export default function App() {
             likedIds={likedIds}
             onPlayTrack={playTrack}
             onToggleLike={toggleLike}
+            onTracksFound={rememberTracks}
           />
         </AppShell>
       )}
@@ -190,6 +217,7 @@ export default function App() {
         <AppShell variant="base" app={app}>
           <PlaylistView
             playlist={playlist}
+            tracks={knownTracks}
             currentTrackId={currentTrackId}
             isPlaying={isPlaying}
             likedIds={likedIds}

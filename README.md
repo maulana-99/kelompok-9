@@ -6,7 +6,7 @@ Aplikasi musik (playlist, follow, riwayat dengar) dengan backend REST API dan fr
 |---|---|
 | Backend | Go 1.27 + Gin + GORM |
 | Database | PostgreSQL 18 (minimal 13) |
-| Frontend | React 19 + TypeScript + Vite 8 + Tailwind CSS 3 |
+| Frontend | React 18 + TypeScript + Vite 5 + Tailwind CSS 3 |
 
 Panduan ini berlaku untuk **Windows, macOS, dan Linux**. Perintah yang berbeda antar-OS ditulis terpisah:
 
@@ -50,7 +50,7 @@ kelompok-9/
 | Tool | Versi | Catatan |
 |---|---|---|
 | Go | ≥ 1.27 | Go ≥ 1.21 otomatis mengunduh toolchain sesuai `go.mod` |
-| Node.js | ≥ 20.19 atau ≥ 22.12 | syarat Vite 8; npm ikut terpasang |
+| Node.js | ≥ 18 | sesuai Vite 5; npm ikut terpasang |
 | PostgreSQL | 18 (minimal 13) | perlu `psql` di `PATH` |
 | Git | terbaru | |
 

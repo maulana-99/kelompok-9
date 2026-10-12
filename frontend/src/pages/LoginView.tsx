@@ -1,28 +1,51 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Music2, Eye, EyeOff, Check } from 'lucide-react';
 import { cx } from '../lib/utils';
+import { createUser, login } from '../lib/api';
+import type { AppUser } from '../types';
 
 const inputClass =
   'w-full border border-white/10 bg-sunken px-[17px] py-[13px] text-[14px] leading-5 text-ink outline-none transition-colors placeholder:text-muted focus:border-primary/60';
 
+interface LoginViewProps {
+  defaultUsername: string;
+  onLogin: (user: AppUser) => void;
+}
+
 /** Login View (frame "Login"). Tab Log In / Sign Up berpindah tanpa halaman baru. */
-export default function LoginView({ defaultEmail, onLogin }) {
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+export default function LoginView({ defaultUsername, onLogin }: LoginViewProps) {
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState(defaultEmail);
-  const [password, setPassword] = useState('password123');
+  const [username, setUsername] = useState(defaultUsername);
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const isLogin = mode === 'login';
 
-  const submit = (e) => {
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!email.trim() || !password) return setError('Please fill in your email and password.');
+    if (!username.trim() || !password) return setError('Please fill in your username and password.');
     if (!isLogin && !name.trim()) return setError('Please enter your name.');
     setError('');
-    onLogin({ email: email.trim(), name: name.trim() });
+    setSubmitting(true);
+    try {
+      if (!isLogin) {
+        await createUser({ name: name.trim(), username: username.trim(), password });
+      }
+      const auth = await login({ username: username.trim(), password });
+      onLogin({
+        ...auth.user,
+        handle: `@${auth.user.username}`,
+        plan: 'Free Plan',
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to sign in.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -44,10 +67,10 @@ export default function LoginView({ defaultEmail, onLogin }) {
 
         {/* Tab switcher */}
         <div className="flex w-[calc(100%-66px)] bg-card p-1" role="tablist">
-          {[
+          {([
             { id: 'login', label: 'Log In' },
             { id: 'signup', label: 'Sign Up' },
-          ].map((tab) => (
+          ] as const).map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -79,10 +102,16 @@ export default function LoginView({ defaultEmail, onLogin }) {
           )}
 
           <div className="flex flex-col gap-[6px]">
-            <label htmlFor="email" className="text-[12px] font-medium leading-4 text-dim">
-              Email
+            <label htmlFor="username" className="text-[12px] font-medium leading-4 text-dim">
+              Username
             </label>
-            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} />
+            <input
+            id="username"
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className={inputClass}
+            />
           </div>
 
           <div className="flex flex-col gap-[6px]">
@@ -100,6 +129,7 @@ export default function LoginView({ defaultEmail, onLogin }) {
               <input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={cx(inputClass, 'pr-[41px]')}
@@ -137,9 +167,10 @@ export default function LoginView({ defaultEmail, onLogin }) {
 
           <button
             type="submit"
+            disabled={submitting}
             className="w-full bg-primary py-3 text-[14px] font-semibold leading-5 text-on-primary shadow-primary transition hover:brightness-110"
           >
-            {isLogin ? 'Log In' : 'Create Account'}
+            {submitting ? 'Please wait...' : isLogin ? 'Log In' : 'Create Account'}
           </button>
 
           <p className="flex justify-center gap-1 pt-3 text-[12px] leading-4 text-dim">

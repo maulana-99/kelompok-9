@@ -1,5 +1,11 @@
+import type { topArtists } from '../data/mock';
+
+interface ArtistCardProps {
+  artist: (typeof topArtists)[number];
+}
+
 /** Kartu artis (Top Artists di Home). */
-export default function ArtistCard({ artist }) {
+export default function ArtistCard({ artist }: ArtistCardProps) {
   return (
     <div className="flex h-[164px] min-w-0 flex-1 flex-col items-center border border-dash-line/40 bg-dash-card px-2 pt-4 transition-colors hover:bg-dash-hover">
       <div className="mb-3 flex size-20 shrink-0 items-center justify-center bg-dash-line text-[24px] font-bold leading-8 text-dash-muted">

@@ -1,17 +1,38 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Play, ListMusic, Check } from 'lucide-react';
 import { cx } from '../lib/utils';
 import SearchSongsTable from '../components/SearchSongsTable';
 import Equalizer from '../components/Equalizer';
 import {
-  tracks,
   searchFilters,
   topResult,
   relevantPlaylists,
   people as peopleData,
 } from '../data/mock';
+import { searchMusic } from '../lib/api';
+import { toTrack } from '../lib/utils';
+import type { Track } from '../types';
 
-function SectionTitle({ children, action }) {
+interface SectionTitleProps {
+  children: React.ReactNode;
+  action?: string;
+}
+
+interface PlaylistTileProps {
+  item: (typeof relevantPlaylists)[number];
+}
+
+interface SearchViewProps {
+  query: string;
+  currentTrackId: string;
+  isPlaying: boolean;
+  likedIds: string[];
+  onPlayTrack: (id: string) => void;
+  onToggleLike: (id: string) => void;
+  onTracksFound: (tracks: Track[]) => void;
+}
+
+function SectionTitle({ children, action }: SectionTitleProps) {
   return (
     <div className="flex items-center justify-between pb-3">
       <h3 className="text-[12px] font-semibold uppercase leading-4 tracking-[1.2px] text-muted">{children}</h3>
@@ -24,7 +45,7 @@ function SectionTitle({ children, action }) {
   );
 }
 
-function PlaylistTile({ item }) {
+function PlaylistTile({ item }: PlaylistTileProps) {
   return (
     <button
       type="button"
@@ -60,26 +81,58 @@ function PlaylistTile({ item }) {
 }
 
 /** Search View (hasil pencarian) — frame "Search Bar". */
-export default function SearchView({ query, currentTrackId, isPlaying, likedIds, onPlayTrack, onToggleLike }) {
+export default function SearchView({
+  query,
+  currentTrackId,
+  isPlaying,
+  likedIds,
+  onPlayTrack,
+  onToggleLike,
+  onTracksFound,
+}: SearchViewProps) {
   const [filter, setFilter] = useState('ALL');
-  const [following, setFollowing] = useState(() =>
+  const [following, setFollowing] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(peopleData.map((p) => [p.id, p.following])),
   );
+  const [songResults, setSongResults] = useState<Track[]>([]);
+  const [searchError, setSearchError] = useState('');
+  const [searching, setSearching] = useState(false);
 
   const q = query.trim().toLowerCase();
 
-  const songResults = useMemo(() => {
-    if (!q) return tracks.filter((t) => t.artist === 'Frank Ocean').slice(0, 4);
-    return tracks.filter((t) => `${t.title} ${t.artist} ${t.album}`.toLowerCase().includes(q)).slice(0, 8);
-  }, [q]);
+  useEffect(() => {
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      setSearching(true);
+      setSearchError('');
+      try {
+        const results = (await searchMusic(query.trim() || 'Frank Ocean', 20)).map(toTrack);
+        if (active) {
+          setSongResults(results);
+          onTracksFound(results);
+        }
+      } catch (cause) {
+        if (active) {
+          setSongResults([]);
+          setSearchError(cause instanceof Error ? cause.message : 'Unable to search songs.');
+        }
+      } finally {
+        if (active) setSearching(false);
+      }
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [query, onTracksFound]);
 
-  const matches = (hay) => !q || hay.toLowerCase().includes(q);
+  const matches = (hay: string) => !q || hay.toLowerCase().includes(q);
   const showTop = matches(topResult.name) || songResults.length > 0;
   const people = peopleData.filter((p) => matches(`${p.name} ${p.handle}`));
   const plays = relevantPlaylists.filter((p) => matches(`${p.title} ${p.subtitle}`) || matches(topResult.name));
 
-  const show = (name) => filter === 'ALL' || filter === name;
-  const nothing = q && !songResults.length && !people.length && !plays.length && !matches(topResult.name);
+  const show = (name: string) => filter === 'ALL' || filter === name;
+  const nothing = Boolean(q && !songResults.length && !people.length && !plays.length && !matches(topResult.name));
 
   return (
     <div className="flex flex-col gap-10 px-8 pb-8 pt-0">
@@ -107,6 +160,9 @@ export default function SearchView({ query, currentTrackId, isPlaying, likedIds,
           No results for &ldquo;{query}&rdquo;. Try another artist, song or playlist.
         </p>
       )}
+
+      {searchError && <p role="alert" className="text-center text-[14px] text-primary-soft">{searchError}</p>}
+      {searching && <p role="status" className="text-center text-[12px] text-muted">Searching songs...</p>}
 
       {!nothing && (
         <>
