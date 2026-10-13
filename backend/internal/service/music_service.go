@@ -37,6 +37,11 @@ const (
 
 	ytmSongsFilter = "EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D"
 
+	// Filter for the "Video" shelf (music videos, covers, remixes, MVs).
+	// Replaces the previously unfiltered search: without a filter the API
+	// also returns podcasts, episodes, artist profiles, etc. (query "tes" returned something about "tes urin" xD).
+	ytmVideosFilter = "EgWKAQIQAWoKEAkQChAFEAMQBA%3D%3D"
+
 	// The yt-dlp output stream URL is valid for about 6 hours, cache it for 4 hours..
 	streamCacheTTL = 4 * time.Hour
 	// Time limit for calling yt-dlp.
@@ -106,6 +111,11 @@ type ytSearchSection struct {
 }
 
 type ytMusicShelf struct {
+	Title *struct {
+		Runs []struct {
+			Text string `json:"text"`
+		} `json:"runs"`
+	} `json:"title"`
 	Contents []struct {
 		MusicResponsiveListItemRenderer *ytMusicListItem `json:"musicResponsiveListItemRenderer"`
 	} `json:"contents"`
@@ -144,6 +154,14 @@ type ytMusicListItem struct {
 	} `json:"playlistItemData"`
 }
 
+// ytItem pairs a search item with the type ("song"/"video") derived from the
+// shelf it was found in; empty for flat sections where the type label sits in
+// the metadata column instead.
+type ytItem struct {
+	list *ytMusicListItem
+	typ  string
+}
+
 func (s *musicService) Search(ctx context.Context, query string, limit int) ([]model.MusicResult, error) {
 	if limit <= 0 {
 		limit = 20
@@ -151,13 +169,13 @@ func (s *musicService) Search(ctx context.Context, query string, limit int) ([]m
 
 	// Two searches run in parallel:
 	//  - "Songs" filter : dense song results, complete metadata
-	//  - no filter      : also loads VIDEOs (covers, remixes, MVs) that don't appear in the songs shelf, these often went missing
+	//  - "Videos" filter: music videos (covers, remixes, MVs) that don't appear in the songs shelf, filtered so non-music results never came in.
 	var (
-		wg              sync.WaitGroup
-		filteredItems   []*ytMusicListItem
-		unfilteredItems []*ytMusicListItem
-		filteredErr     error
-		unfilteredErr   error
+		wg         sync.WaitGroup
+		songItems  []ytItem
+		videoItems []ytItem
+		songErr    error
+		videoErr   error
 	)
 
 	wg.Add(2)
@@ -165,51 +183,53 @@ func (s *musicService) Search(ctx context.Context, query string, limit int) ([]m
 		defer wg.Done()
 		parsed, err := s.fetchSearch(ctx, query, ytmSongsFilter)
 		if err != nil {
-			filteredErr = err
+			songErr = err
 			return
 		}
-		filteredItems = s.collectItems(parsed)
+		songItems = s.collectItems(parsed)
 	}()
 	go func() {
 		defer wg.Done()
-		parsed, err := s.fetchSearch(ctx, query, "")
+		parsed, err := s.fetchSearch(ctx, query, ytmVideosFilter)
 		if err != nil {
-			unfilteredErr = err
+			videoErr = err
 			return
 		}
-		unfilteredItems = s.collectItems(parsed)
+		videoItems = s.collectItems(parsed)
 	}()
 	wg.Wait()
 
 	// Both fail == error. If either succeeds, its results are still used.
-	if filteredErr != nil && unfilteredErr != nil {
-		return nil, filteredErr
+	if songErr != nil && videoErr != nil {
+		return nil, songErr
 	}
 
-	// Merge: songs shelf results first (most relevant), reserving a few slots for other results (videos/covers/remixes from the unfiltered search) 
-	// so they still show up instead of drowning in the song list.
+	// Merge: songs shelf results first (most relevant), reserving a few slots for
+	// music videos (covers/remixes/MVs) so they still show up instead of
+	// drowning in the song list.
 	songCap := limit - min(5, limit/4)
 	seen := make(map[string]bool)
 	results := make([]model.MusicResult, 0, limit)
-	addAll := func(items []*ytMusicListItem, cap int) {
-		for _, listItem := range items {
+	addAll := func(items []ytItem, cap int) {
+		for _, it := range items {
 			if len(results) >= cap {
 				return
 			}
+			listItem := it.list
 			if listItem == nil || listItem.PlaylistItemData == nil || listItem.PlaylistItemData.VideoID == "" {
 				continue
 			}
 			if seen[listItem.PlaylistItemData.VideoID] {
 				continue
 			}
-			if result, ok := parseListItem(listItem); ok {
+			if result, ok := parseListItem(listItem, it.typ); ok {
 				seen[result.VideoID] = true
 				results = append(results, result)
 			}
 		}
 	}
-	addAll(filteredItems, songCap)
-	addAll(unfilteredItems, limit)
+	addAll(songItems, songCap)
+	addAll(videoItems, limit)
 	return results, nil
 }
 
@@ -261,9 +281,11 @@ func (s *musicService) fetchSearch(ctx context.Context, query, params string) (*
 }
 
 // collectItems gathers all items with a potential videoId from the two
-// possible response shapes: shelf (songs) and itemSection (flat results).
-func (s *musicService) collectItems(parsed *ytSearchResponse) []*ytMusicListItem {
-	var items []*ytMusicListItem
+// possible response shapes: shelf (songs/videos) and itemSection (flat results).
+// Shelf items are tagged with the type implied by the shelf title, because
+// their metadata column does not repeat the type label.
+func (s *musicService) collectItems(parsed *ytSearchResponse) []ytItem {
+	var items []ytItem
 	if parsed == nil || parsed.Contents == nil || parsed.Contents.TabbedSearchResultsRenderer == nil {
 		return items
 	}
@@ -274,12 +296,13 @@ func (s *musicService) collectItems(parsed *ytSearchResponse) []*ytMusicListItem
 		for _, section := range tab.TabRenderer.Content.SectionListRenderer.Contents {
 			switch {
 			case section.MusicShelfRenderer != nil:
+				shelfType := musicTypeLabels[shelfTitle(section.MusicShelfRenderer)]
 				for _, item := range section.MusicShelfRenderer.Contents {
-					items = append(items, item.MusicResponsiveListItemRenderer)
+					items = append(items, ytItem{list: item.MusicResponsiveListItemRenderer, typ: shelfType})
 				}
 			case section.ItemSection != nil:
 				for _, item := range section.ItemSection.Contents {
-					items = append(items, item.MusicResponsiveListItemRenderer)
+					items = append(items, ytItem{list: item.MusicResponsiveListItemRenderer})
 				}
 			}
 		}
@@ -287,8 +310,37 @@ func (s *musicService) collectItems(parsed *ytSearchResponse) []*ytMusicListItem
 	return items
 }
 
-// An item can be a "Song" (columns: title, artist - album - duration) or a "Video" (columns: title, Video - channel - view count - duration).
-func parseListItem(item *ytMusicListItem) (model.MusicResult, bool) {
+// shelfTitle reads the localized shelf title ("Lagu", "Video").
+func shelfTitle(shelf *ytMusicShelf) string {
+	if shelf == nil || shelf.Title == nil || len(shelf.Title.Runs) == 0 {
+		return ""
+	}
+	return shelf.Title.Runs[0].Text
+}
+
+// musicTypeLabels maps metadata type labels to a normalized type
+// ("song"/"video") exposed on MusicResult.Type.
+var musicTypeLabels = map[string]string{
+	"Lagu": "song", "Song": "song",
+	"Video": "video",
+}
+
+// nonMusicLabels are metadata type labels of non-music items (podcasts,
+// episodes, artist/channel profiles, playlists, releases). Items carrying one
+// of these labels are rejected — e.g. query "tes" used to surface the podcast
+// episode "TES URINE POSITIF, BUKAN PIDANA".
+var nonMusicLabels = map[string]bool{
+	"Episode": true, "Podcast": true,
+	"Artis": true, "Artist": true,
+	"Profil": true, "Profile": true,
+	"Playlist": true,
+	"Single": true, "EP": true, "Album": true,
+}
+
+// An item can be a "Song" (columns: title, artist - album - duration) or a "Video" (columns: title, channel - view count - duration).
+// shelfType is the type implied by the shelf the item came from ("song"/"video");
+// it wins over the metadata label, which only flat-section items carry.
+func parseListItem(item *ytMusicListItem, shelfType string) (model.MusicResult, bool) {
 	title := columnRuns(item, 0)
 	if title == "" {
 		return model.MusicResult{}, false
@@ -307,14 +359,30 @@ func parseListItem(item *ytMusicListItem) (model.MusicResult, bool) {
 	}
 
 	// Artist/album come from the metadata parts of column 1; drop parts that
-	// are type labels ("Video", "Lagu"), view counts, or years.
+	// are type labels ("Video", "Lagu"), view counts, or years. On flat
+	// sections the label also classifies the item, and any non-music label
+	// rejects the item outright.
+	itemType := shelfType
 	var metaParts []string
 	for _, part := range splitColumn(item, 1) {
+		if t, ok := musicTypeLabels[part]; ok {
+			if itemType == "" {
+				itemType = t
+			}
+			continue
+		}
+		if nonMusicLabels[part] {
+			return model.MusicResult{}, false
+		}
 		if isNoisePart(part) {
 			continue
 		}
 		metaParts = append(metaParts, part)
 	}
+	if itemType == "" {
+		itemType = "song"
+	}
+	result.Type = itemType
 	if len(metaParts) > 0 {
 		result.Artist = metaParts[0]
 	}

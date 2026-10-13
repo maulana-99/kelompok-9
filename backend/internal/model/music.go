@@ -8,6 +8,9 @@ type MusicResult struct {
 	Title     string `json:"title"`
 	Artist    string `json:"artist"`
 	Album     string `json:"album,omitempty"`
+	// Type klasifikasi item: "song" atau "video"
+	Type string `json:"type,omitempty"`
+
 	Thumbnail string `json:"thumbnail"`
 	Duration  string `json:"duration"`
 }
