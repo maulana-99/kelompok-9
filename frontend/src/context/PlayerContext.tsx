@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { streamUrl } from '../lib/music';
 import { toDurationLabel, toSeconds } from '../lib/utils';
-import { playlists as seedPlaylists, tracks as seedTracks } from '../data/mock';
 import ModalCreatePlaylist from '../components/ModalCreatePlaylist';
 import type { AppView, CreatePlaylistInput, Playlist, Track } from '../types';
 
@@ -67,8 +66,8 @@ export function usePlayer(): PlayerStore {
  * Berdiri DI ATAS <Routes>, sehingga `<audio>` tidak pernah unmount saat
  * user pindah halaman — musik tetap jalan.
  *
- * Catatan: endpoint /playlists belum ada di backend, jadi playlist dibuat
- * lokal dulu (seed + buatan user). Panggilan API ditambahkan di sini
+ * Catatan: endpoint /playlists belum ada di backend, jadi daftar playlist
+ * mulai kosong dan hanya diisi buatan user. Panggilan API ditambahkan di sini
  * saat endpoint-nya sudah tersedia.
  */
 export function PlayerProvider({ children }: { children: ReactNode }) {
@@ -77,8 +76,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const { logout: authLogout } = useAuth();
 
   const [query, setQueryState] = useState('');
-  const [playlists, setPlaylists] = useState<Playlist[]>(seedPlaylists);
-  const [knownTracks, setKnownTracks] = useState<Track[]>(seedTracks);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [knownTracks, setKnownTracks] = useState<Track[]>([]);
   const [showCreate, setShowCreate] = useState(false);
 
   // Player
