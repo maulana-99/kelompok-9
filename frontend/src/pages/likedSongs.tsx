@@ -1,143 +1,77 @@
-import {
-  Heart,
-  ArrowLeft,
-  Play,
-} from "lucide-react";
+import { Heart, Play, Pause } from 'lucide-react';
+import { cx, toDurationLabel, toSeconds } from '../lib/utils';
+import TrackList from '../components/TrackList';
+import { usePlayer } from '../context/PlayerContext';
 
-import { Link } from "react-router-dom";
-
-const likedSongs = [
-  {
-    title: "Snooze",
-    artist: "SZA",
-    duration: "3:20",
-    image:
-      "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500",
-  },
-  {
-    title: "Die With A Smile",
-    artist: "Lady Gaga, Bruno Mars",
-    duration: "4:12",
-    image:
-      "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=500",
-  },
-  {
-    title: "Too Sweet",
-    artist: "Hozier",
-    duration: "4:11",
-    image:
-      "https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?w=500",
-  },
-  {
-    title: "BIRDS OF A FEATHER",
-    artist: "Billie Eilish",
-    duration: "3:30",
-    image:
-      "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=500",
-  },
-  {
-    title: "APT.",
-    artist: "ROSÉ, Bruno Mars",
-    duration: "2:49",
-    image:
-      "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500",
-  },
-];
-
+/** Halaman Liked Songs — daftar lagu yang disukai user (state in-app). */
 export default function LikedSongs() {
+  const { likedTracks: tracks, currentTrackId, isPlaying, likedIds, playTrack, toggleLike, togglePlay } = usePlayer();
+
+  const playable = tracks.filter((track) => track.videoId);
+  const listPlaying = isPlaying && playable.some((track) => track.id === currentTrackId);
+  const canPlay = listPlaying || playable.length > 0;
+  const duration = toDurationLabel(tracks.reduce((sum, track) => sum + toSeconds(track.duration), 0));
+
+  const handlePlay = () => {
+    if (listPlaying) return togglePlay();
+    if (playable.length) playTrack(playable[0].id, playable);
+  };
+
   return (
-    <div className="min-h-screen bg-[#1B1B1B] px-8 py-6 text-[#F3F3F3]">
-
-      <Link
-        to="/home"
-        className="mb-8 flex w-fit items-center gap-2 text-sm text-gray-400 hover:text-white"
-      >
-        <ArrowLeft size={18} />
-        Back to Home
-      </Link>
-
-      <div className="flex items-center gap-5">
-
-        <div className="flex h-32 w-32 items-center justify-center rounded-xl bg-gradient-to-br from-[#E9204F] to-[#6b1028]">
-          <Heart
-            size={50}
-            fill="currentColor"
-            className="text-white"
-          />
-        </div>
-
-        <div>
-          <p className="text-sm text-gray-400">
-            Playlist
-          </p>
-
-          <h1 className="mt-2 text-4xl font-bold">
-            Liked Songs
-          </h1>
-
-          <p className="mt-2 text-sm text-gray-500">
-            Your favorite songs
-          </p>
-        </div>
-
-      </div>
-
-      <div className="mt-8">
-        <button className="flex h-12 w-12 items-center justify-center rounded-full bg-[#E9204F] text-white">
-          <Play size={20} fill="currentColor" />
-        </button>
-      </div>
-
-      <div className="mt-8">
-
-        <div className="grid grid-cols-[40px_1fr_150px] border-b border-[#303030] px-4 pb-3 text-xs text-gray-500">
-          <span>#</span>
-          <span>Song</span>
-          <span>Duration</span>
-        </div>
-
-        <div className="mt-2">
-
-          {likedSongs.map((song, index) => (
-            <div
-              key={song.title}
-              className="group grid grid-cols-[40px_1fr_150px] items-center rounded-lg px-4 py-3 transition hover:bg-[#252525]"
-            >
-
-              <span className="text-sm text-gray-500">
-                {index + 1}
-              </span>
-
-              <div className="flex items-center gap-4">
-
-                <img
-                  src={song.image}
-                  alt={song.title}
-                  className="h-12 w-12 rounded-md object-cover"
-                />
-
-                <div>
-                  <p className="text-sm font-semibold">
-                    {song.title}
-                  </p>
-
-                  <p className="mt-1 text-xs text-gray-500">
-                    {song.artist}
-                  </p>
-                </div>
-
-              </div>
-
-              <span className="text-xs text-gray-500">
-                {song.duration}
-              </span>
-
+    <div>
+      {/* Hero */}
+      <section className="bg-gradient-to-b from-primary/15 via-primary/5 to-transparent">
+        <div className="flex flex-col gap-7 p-8 sm:flex-row sm:items-end">
+          <div className="flex size-56 shrink-0 items-center justify-center border border-line/60 bg-gradient-to-br from-primary to-primary-deep shadow-card">
+            <Heart className="size-16 text-on-primary" fill="currentColor" strokeWidth={1.2} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="pb-1 text-[12px] font-semibold uppercase leading-4 tracking-[1.2px] text-muted">PLAYLIST</p>
+            <h1 className="pb-1 text-[48px] font-bold leading-[48px] tracking-[-1.2px] text-ink">Liked Songs</h1>
+            <p className="max-w-[672px] pb-4 pt-3 text-[16px] leading-[23px] text-dim">
+              {tracks.length === 0
+                ? 'Lagu yang kamu beri tanda hati akan muncul di sini.'
+                : `${tracks.length} lagu yang kamu sukai.`}
+            </p>
+            <div className="flex items-center gap-2 pb-6 text-[12px] leading-4">
+              <span className="font-medium text-ink">{tracks.length} songs</span>
+              <span className="text-muted">•</span>
+              <span className="text-muted">{duration}</span>
             </div>
-          ))}
 
+            <button
+              type="button"
+              onClick={handlePlay}
+              disabled={!canPlay}
+              className={cx(
+                'flex h-11 items-center gap-2 bg-primary px-7 text-[14px] font-semibold leading-5 text-on-primary shadow-primary transition hover:brightness-110',
+                !canPlay && 'cursor-not-allowed opacity-50',
+              )}
+            >
+              {listPlaying ? <Pause className="size-[13px]" fill="currentColor" /> : <Play className="size-[13px]" fill="currentColor" />}
+              {listPlaying ? 'Pause' : 'Play'}
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
 
+      {/* Tracklist */}
+      <section className="pt-4">
+        {tracks.length ? (
+          <TrackList
+            tracks={tracks}
+            currentTrackId={currentTrackId}
+            isPlaying={isPlaying}
+            likedIds={likedIds}
+            onPlay={(id) => playTrack(id, tracks)}
+            onToggleLike={toggleLike}
+          />
+        ) : (
+          <p className="px-8 py-12 text-center text-[14px] text-muted">
+            Belum ada lagu yang disukai. Buka Search lalu tekan tombol hati pada lagu favoritmu.
+          </p>
+        )}
+      </section>
     </div>
   );
 }

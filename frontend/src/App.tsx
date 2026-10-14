@@ -1,28 +1,24 @@
+import { type ReactNode } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { PlayerProvider } from './context/PlayerContext';
+import AppShell from './components/AppShell';
+import HomeView from './pages/HomeView';
+import LibraryView from './pages/LibraryView';
+import LoginView from './pages/LoginView';
+import PlaylistView from './pages/PlaylistView';
+import SearchView from './pages/SearchView';
+import LikedSongs from './pages/likedSongs';
+
+import './index.css';
+
 // RequireAuth (only accessible if the user are logged in.. otherwise, redirect to login page)
-import type { ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-
-import { AuthProvider, useAuth } from "./context/AuthContext";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-
-import MelodiMusicDashboard from "./pages/MelodiMusicDashboard";
-import Music from './pages/Music';
-import Search from "./pages/search";
-import Library from "./pages/library";
-import LikedSongs from "./pages/likedSongs";
-
-import "./index.css";
-
 function RequireAuth({ children }: { children: ReactNode }) {
   const { token, ready } = useAuth();
 
   if (!ready) {
-    return (
-      <div className="min-h-screen bg-[#1b1b1b] flex items-center justify-center text-[#f3f3f3]/50">
-        Memuat...
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center bg-base text-ink/50">Memuat...</div>;
   }
 
   if (!token) {
@@ -36,57 +32,71 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/music" element={<Music />} />
-          <Route
-            path="/"
-            element={
-              <RequireAuth>
-                <MelodiMusicDashboard />
-              </RequireAuth>
-            }
-          />
+        {/* PlayerProvider berada di atas <Routes>: <audio> tidak unmount saat pindah halaman. */}
+        <PlayerProvider>
+          <Routes>
+            <Route path="/login" element={<LoginView />} />
+            <Route path="/signup" element={<LoginView defaultMode="signup" />} />
 
-          <Route
-            path="/home"
-            element={
-              <RequireAuth>
-                <MelodiMusicDashboard />
-              </RequireAuth>
-            }
-          />
+            <Route
+              path="/"
+              element={
+                <RequireAuth>
+                  <AppShell>
+                    <HomeView />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
+            <Route path="/home" element={<Navigate to="/" replace />} />
 
-          <Route
-            path="/search"
-            element={
-              <RequireAuth>
-                <Search />
-              </RequireAuth>
-            }
-          />
+            <Route
+              path="/search"
+              element={
+                <RequireAuth>
+                  <AppShell autoFocusSearch>
+                    <SearchView />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
 
-          <Route
-            path="/library"
-            element={
-              <RequireAuth>
-                <Library />
-              </RequireAuth>
-            }
-          />
+            <Route
+              path="/library"
+              element={
+                <RequireAuth>
+                  <AppShell>
+                    <LibraryView />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
 
-          <Route
-            path="/liked-songs"
-            element={
-              <RequireAuth>
-                <LikedSongs />
-              </RequireAuth>
-            }
-          />
+            <Route
+              path="/playlist/:playlistId"
+              element={
+                <RequireAuth>
+                  <AppShell>
+                    <PlaylistView />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route
+              path="/liked-songs"
+              element={
+                <RequireAuth>
+                  <AppShell>
+                    <LikedSongs />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </PlayerProvider>
       </BrowserRouter>
     </AuthProvider>
   );
