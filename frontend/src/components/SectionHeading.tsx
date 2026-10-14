@@ -5,41 +5,21 @@ interface SectionHeadingProps {
   title: string;
   action?: string;
   onAction?: () => void;
-  variant?: 'dash' | 'base';
   className?: string;
   children?: ReactNode;
 }
 
-/** Judul section (mis. "Recently Played" + link "See all"). */
-export default function SectionHeading({
-  title,
-  action,
-  onAction,
-  variant = 'dash',
-  className = '',
-  children,
-}: SectionHeadingProps) {
-  const dash = variant === 'dash';
+/** Judul section (mis. "Recently Played"). */
+export default function SectionHeading({ title, action, onAction, className = '', children }: SectionHeadingProps) {
   return (
     <div className={cx('flex items-center justify-between pb-4', className)}>
-      <h2
-        className={cx(
-          dash
-            ? 'text-[20px] font-bold leading-7 tracking-[-0.5px] text-dash-ink'
-            : 'text-[14px] font-bold uppercase leading-5 tracking-[0.35px] text-ink',
-        )}
-      >
-        {title}
-      </h2>
+      <h2 className="text-[14px] font-bold uppercase leading-5 tracking-[0.35px] text-ink">{title}</h2>
       {children}
       {action && (
         <button
           type="button"
           onClick={onAction}
-          className={cx(
-            'transition-colors hover:text-primary',
-            dash ? 'text-[12px] font-semibold leading-4 text-dash-muted' : 'text-[12px] font-semibold uppercase tracking-[0.6px] text-primary-soft',
-          )}
+          className="text-[12px] font-semibold uppercase tracking-[0.6px] text-primary-soft transition-colors hover:text-primary"
         >
           {action}
         </button>

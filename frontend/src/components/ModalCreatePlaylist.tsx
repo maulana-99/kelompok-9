@@ -26,10 +26,15 @@ export default function ModalCreatePlaylist({ tracks, onClose, onCreate }: Modal
   const fileRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Tutup dengan Esc + kunci scroll body
+  // Tutup dengan Esc + kunci scroll body (mount-only: jangan curi fokus tiap render)
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -39,7 +44,7 @@ export default function ModalCreatePlaylist({ tracks, onClose, onCreate }: Modal
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose]);
+  }, []);
 
   const recommended = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -1,6 +1,8 @@
 import { Play, Pause, Heart, Download, MoreHorizontal, ListMusic } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 import { cx, toDurationLabel, toSeconds } from '../lib/utils';
 import TrackList from '../components/TrackList';
+import { usePlayer } from '../context/PlayerContext';
 import type { Playlist, Track } from '../types';
 
 const BARS = ['h-3', 'h-6', 'h-9', 'h-4', 'h-7', 'h-2', 'h-5'];
@@ -44,38 +46,28 @@ function Cover({ playlist }: CoverProps) {
 }
 
 /** Playlist Preview View. */
-interface PlaylistViewProps {
-  playlist: Playlist;
-  tracks: Track[];
-  currentTrackId: string;
-  isPlaying: boolean;
-  likedIds: string[];
-  onPlayTrack: (id: string) => void;
-  onToggleLike: (id: string) => void;
-  onTogglePlay: () => void;
-}
+export default function PlaylistView() {
+  const { playlistId } = useParams<{ playlistId: string }>();
+  const { playlists, tracks, currentTrackId, isPlaying, likedIds, playTrack, toggleLike, togglePlay } = usePlayer();
 
-export default function PlaylistView({
-  playlist,
-  tracks,
-  currentTrackId,
-  isPlaying,
-  likedIds,
-  onPlayTrack,
-  onToggleLike,
-  onTogglePlay,
-}: PlaylistViewProps) {
+  const playlist = playlists.find((p) => p.id === playlistId);
+  if (!playlist) {
+    return <p className="px-8 py-12 text-center text-[14px] text-muted">Playlist tidak ditemukan.</p>;
+  }
+
   const list = playlist.trackIds
     .map((id) => tracks.find((track) => track.id === id))
     .filter((track): track is Track => track !== undefined);
+  const playableList = list.filter((track) => track.videoId);
   const count = playlist.trackCount ?? list.length;
   const duration =
     playlist.durationLabel ?? toDurationLabel(list.reduce((s, t) => s + toSeconds(t.duration), 0));
-  const playlistIsPlaying = isPlaying && list.some((t) => t.id === currentTrackId);
+  const playlistIsPlaying = isPlaying && playableList.some((t) => t.id === currentTrackId);
+  const canPlay = playlistIsPlaying || playableList.length > 0;
 
   const handlePlay = () => {
-    if (playlistIsPlaying) return onTogglePlay();
-    if (list.length) onPlayTrack(list[0].id);
+    if (playlistIsPlaying) return togglePlay();
+    if (playableList.length) playTrack(playableList[0].id, playableList);
   };
 
   return (
@@ -100,7 +92,11 @@ export default function PlaylistView({
               <button
                 type="button"
                 onClick={handlePlay}
-                className="flex h-11 items-center gap-2 bg-primary px-7 text-[14px] font-semibold leading-5 text-on-primary shadow-primary transition hover:brightness-110"
+                disabled={!canPlay}
+                className={cx(
+                  'flex h-11 items-center gap-2 bg-primary px-7 text-[14px] font-semibold leading-5 text-on-primary shadow-primary transition hover:brightness-110',
+                  !canPlay && 'cursor-not-allowed opacity-50',
+                )}
               >
                 {playlistIsPlaying ? <Pause className="size-[13px]" fill="currentColor" /> : <Play className="size-[13px]" fill="currentColor" />}
                 {playlistIsPlaying ? 'Pause' : 'Play'}
@@ -132,8 +128,8 @@ export default function PlaylistView({
             currentTrackId={currentTrackId}
             isPlaying={isPlaying}
             likedIds={likedIds}
-            onPlay={onPlayTrack}
-            onToggleLike={onToggleLike}
+            onPlay={(id) => playTrack(id, list)}
+            onToggleLike={toggleLike}
           />
         ) : (
           <p className="px-8 py-12 text-center text-[14px] text-muted">This playlist is empty. Use search to add songs.</p>

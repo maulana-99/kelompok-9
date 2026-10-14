@@ -1,60 +1,40 @@
-import { LayoutGrid, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import SectionHeading from '../components/SectionHeading';
 import RecentTrackList from '../components/RecentTrackList';
 import PlaylistCard from '../components/PlaylistCard';
-import ArtistCard from '../components/ArtistCard';
-import { recentlyPlayed, topArtists } from '../data/mock';
-import type { Playlist } from '../types';
-
-interface HomeViewProps {
-  playlists: Playlist[];
-  currentTrackId: string;
-  isPlaying: boolean;
-  onPlayTrack: (id: string) => void;
-  onOpenPlaylist: (id: string) => void;
-  onCreatePlaylist: () => void;
-}
+import { usePlayer } from '../context/PlayerContext';
 
 /** Home/Dashboard View. */
-export default function HomeView({
-  playlists,
-  currentTrackId,
-  isPlaying,
-  onPlayTrack,
-  onOpenPlaylist,
-  onCreatePlaylist,
-}: HomeViewProps) {
+export default function HomeView() {
+  const { playlists, recentTracks, currentTrackId, isPlaying, playTrack, openPlaylist, openCreate } = usePlayer();
+
   return (
     <div className="mx-auto flex max-w-[1280px] flex-col gap-10 p-8">
       <section>
-        <SectionHeading title="Recently Played" action="See all" />
-        <RecentTrackList items={recentlyPlayed} currentTrackId={currentTrackId} isPlaying={isPlaying} onPlay={onPlayTrack} />
+        <SectionHeading title="Recently Played" />
+        <RecentTrackList
+          items={recentTracks}
+          currentTrackId={currentTrackId}
+          isPlaying={isPlaying}
+          onPlay={(id) => playTrack(id, recentTracks)}
+        />
       </section>
 
       <section>
         <SectionHeading title="Your Playlists">
-          <div className="flex items-center gap-[6px]">
-            <button type="button" aria-label="Grid view" className="flex size-8 items-center justify-center bg-dash-card text-dash-dim hover:text-primary">
-              <LayoutGrid className="size-[13.5px]" />
-            </button>
-            <button type="button" aria-label="Create playlist" onClick={onCreatePlaylist} className="flex size-8 items-center justify-center bg-dash-card text-dash-dim hover:text-primary">
-              <Plus className="size-[10.5px]" strokeWidth={3} />
-            </button>
-          </div>
+          <button
+            type="button"
+            aria-label="Create playlist"
+            onClick={openCreate}
+            className="flex size-8 items-center justify-center bg-card text-dim hover:text-primary"
+          >
+            <Plus className="size-[10.5px]" strokeWidth={3} />
+          </button>
         </SectionHeading>
 
         <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
           {playlists.slice(0, 4).map((p) => (
-            <PlaylistCard key={p.id} playlist={p} onOpen={onOpenPlaylist} />
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <SectionHeading title="Top Artists" />
-        <div className="grid grid-cols-3 gap-4 lg:grid-cols-6">
-          {topArtists.map((a) => (
-            <ArtistCard key={a.id} artist={a} />
+            <PlaylistCard key={p.id} playlist={p} onOpen={openPlaylist} />
           ))}
         </div>
       </section>

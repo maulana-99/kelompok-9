@@ -92,12 +92,10 @@ export interface AppUser {
   id?: number;
   name: string;
   username: string;
-  handle: string;
-  plan: string;
   created_at?: string;
 }
 
-export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library';
+export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library' | 'liked-songs';
 
 export interface NavigationEntry {
   view: AppView;
@@ -111,7 +109,7 @@ export interface AppContext {
   setQuery: (value: string) => void;
   playlists: Playlist[];
   activePlaylistId: string | null;
-  navigate: (target: 'home' | 'search' | 'library') => void;
+  navigate: (target: 'home' | 'search' | 'library' | 'liked-songs') => void;
   openPlaylist: (id: string) => void;
   openCreate: () => void;
   logout: () => void;
@@ -119,7 +117,8 @@ export interface AppContext {
   forward: () => void;
   canBack: boolean;
   canForward: boolean;
-  currentTrack: Track;
+  currentTrack: Track | null;
+  trackDuration: number;
   isPlaying: boolean;
   progress: number;
   volume: number;

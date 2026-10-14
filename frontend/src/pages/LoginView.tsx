@@ -1,30 +1,34 @@
 import { useState, type FormEvent } from 'react';
-import { Music2, Eye, EyeOff, Check } from 'lucide-react';
+import { Music2, Eye, EyeOff } from 'lucide-react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { cx } from '../lib/utils';
-import { createUser, login } from '../lib/api';
-import type { AppUser } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 const inputClass =
   'w-full border border-white/10 bg-sunken px-[17px] py-[13px] text-[14px] leading-5 text-ink outline-none transition-colors placeholder:text-muted focus:border-primary/60';
 
 interface LoginViewProps {
-  defaultUsername: string;
   defaultMode?: 'login' | 'signup';
-  onLogin: (user: AppUser) => Promise<void>;
 }
 
 /** Login View (frame "Login"). Tab Log In / Sign Up berpindah tanpa halaman baru. */
-export default function LoginView({ defaultUsername, defaultMode = 'login', onLogin }: LoginViewProps) {
+export default function LoginView({ defaultMode = 'login' }: LoginViewProps) {
+  const { login, signup, ready, token } = useAuth();
+  const navigate = useNavigate();
+
   const [mode, setMode] = useState<'login' | 'signup'>(defaultMode);
   const [name, setName] = useState('');
-  const [username, setUsername] = useState(defaultUsername);
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const isLogin = mode === 'login';
+
+  if (ready && token) {
+    return <Navigate to="/" replace />;
+  }
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -33,15 +37,12 @@ export default function LoginView({ defaultUsername, defaultMode = 'login', onLo
     setError('');
     setSubmitting(true);
     try {
-      if (!isLogin) {
-        await createUser({ name: name.trim(), username: username.trim(), password });
+      if (isLogin) {
+        await login(username.trim(), password);
+      } else {
+        await signup(name.trim(), username.trim(), password);
       }
-      const auth = await login({ username: username.trim(), password });
-      await onLogin({
-        ...auth.user,
-        handle: `@${auth.user.username}`,
-        plan: 'Free Plan',
-      });
+      navigate('/', { replace: true });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to sign in.');
     } finally {
@@ -116,16 +117,9 @@ export default function LoginView({ defaultUsername, defaultMode = 'login', onLo
           </div>
 
           <div className="flex flex-col gap-[6px]">
-            <div className="flex items-center justify-between">
-              <label htmlFor="password" className="text-[12px] font-medium leading-4 text-dim">
-                Password
-              </label>
-              {isLogin && (
-                <button type="button" className="text-[12px] leading-4 text-primary-soft hover:underline">
-                  Forgot password?
-                </button>
-              )}
-            </div>
+            <label htmlFor="password" className="text-[12px] font-medium leading-4 text-dim">
+              Password
+            </label>
             <div className="relative">
               <input
                 id="password"
@@ -145,20 +139,6 @@ export default function LoginView({ defaultUsername, defaultMode = 'login', onLo
               </button>
             </div>
           </div>
-
-          <label className="flex h-7 cursor-pointer items-center gap-[10px] text-[12px] leading-4 text-dim">
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="peer sr-only" />
-            <span
-              className={cx(
-                'flex size-[18px] items-center justify-center border',
-                remember ? 'border-transparent bg-primary text-on-primary' : 'border-white/20 bg-sunken text-transparent',
-                'peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50',
-              )}
-            >
-              <Check className="size-[13px]" strokeWidth={3.5} />
-            </span>
-            Remember me
-          </label>
 
           {error && (
             <p role="alert" className="text-[12px] leading-4 text-primary-soft">

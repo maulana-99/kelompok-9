@@ -15,14 +15,14 @@
     @apply cursor-pointer;
   }
   ::selection {
-    background: rgba(255, 127, 135, 0.35);
+    background: rgba(233, 32, 79, 0.35);
   }
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
   ::-webkit-scrollbar-thumb {
-    background: #2a2a2c;
+    background: #303030;
   }
 }
 

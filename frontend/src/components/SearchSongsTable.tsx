@@ -1,13 +1,14 @@
-import { Music, Heart } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import { cx } from '../lib/utils';
 import Equalizer from './Equalizer';
+import TrackThumb from './TrackThumb';
 import type { Track } from '../types';
 
 const COLS = 'grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_80px_40px] items-center';
 
 interface SearchSongsTableProps {
   tracks: Track[];
-  currentTrackId: string;
+  currentTrackId: string | null;
   isPlaying: boolean;
   likedIds: string[];
   onPlay: (id: string) => void;
@@ -53,15 +54,13 @@ export default function SearchSongsTable({
               {active ? <Equalizer playing={isPlaying} className="ml-[11px] h-[14px]" /> : <span className="pl-[11px]">{String(i + 1).padStart(2, '0')}</span>}
             </div>
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex size-9 shrink-0 items-center justify-center border border-line/60 bg-line">
-                <Music className="size-[13px] text-muted" />
-              </div>
+              <TrackThumb track={t} className="size-9 border-line/60 bg-line" />
               <div className="min-w-0">
                 <p className={cx('truncate text-[14px] font-medium leading-5', active ? 'text-primary-soft' : 'text-ink')}>{t.title}</p>
                 <p className="truncate text-[12px] leading-4 text-muted">{t.artist}</p>
               </div>
             </div>
-            <p className="truncate pr-4 text-[12px] leading-4 text-muted">{t.album}</p>
+            <p className="truncate pr-4 text-[12px] leading-4 text-muted">{t.album || '-'}</p>
             <p className="pr-[18px] text-right text-[12px] leading-4 text-muted">{t.duration}</p>
             <div className="flex justify-center">
               <button

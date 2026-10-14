@@ -2,17 +2,23 @@ import type { MusicSearchResult, Track } from '../types';
 
 export const cx = (...parts: Array<string | false | null | undefined>): string => parts.filter(Boolean).join(' ');
 
-export const toTrack = (result: MusicSearchResult): Track => ({
-  id: result.video_id,
-  videoId: result.video_id,
-  title: result.title,
-  artist: result.artist,
-  album: result.album ?? 'Single',
-  duration: result.duration,
-  explicit: false,
-  added: '',
-  thumbnail: result.thumbnail,
-});
+// "3:45" / "1:02:33" / "3.45" — kolom album kadang ikut terbaca duration saat scraping.
+const DURATION_LIKE = /^\d+([:.]\d{2})+$/;
+
+export const toTrack = (result: MusicSearchResult): Track => {
+  const album = result.album?.trim() ?? '';
+  return {
+    id: result.video_id,
+    videoId: result.video_id,
+    title: result.title,
+    artist: result.artist,
+    album: album && !DURATION_LIKE.test(album) ? album : '-',
+    duration: result.duration,
+    explicit: false,
+    added: '',
+    thumbnail: result.thumbnail,
+  };
+};
 
 /** "3:20" -> 200 */
 export const toSeconds = (mmss = '0:00'): number => {
@@ -36,6 +42,7 @@ export const toDurationLabel = (totalSeconds: number): string => {
 
 export const initialsOf = (artist = ''): string => {
   const words = artist.split(/[\s,]+/).filter(Boolean);
+  if (words.length === 0) return '??';
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   return (words[0][0] + words[1][0]).toUpperCase();
 };

@@ -2,41 +2,73 @@ import type { ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import PlayerFooter from './PlayerFooter';
-import { cx } from '../lib/utils';
-import type { AppContext } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { usePlayer } from '../context/PlayerContext';
+import type { AppContext, AppUser } from '../types';
 
 interface AppShellProps {
-  variant?: 'base' | 'dash';
   navLabel?: string;
   children: ReactNode;
-  app: AppContext;
   headerRight?: ReactNode;
   autoFocusSearch?: boolean;
 }
 
 /**
  * Kerangka halaman setelah login: Sidebar + Header + konten + Player bar.
- * Semua state diterima dari App.
+ * State diambil dari usePlayer() (ada di atas <Routes>, jadi musik tetap jalan).
  */
-export default function AppShell({
-  variant = 'base',
-  navLabel,
-  children,
-  app,
-  headerRight,
-  autoFocusSearch,
-}: AppShellProps) {
-  const dash = variant === 'dash';
-  const footerHeight = dash ? 72 : 76;
+export default function AppShell({ navLabel, children, headerRight, autoFocusSearch }: AppShellProps) {
+  const player = usePlayer();
+  const { user } = useAuth();
+  const footerHeight = 76;
+
+  const appUser: AppUser = user
+    ? {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        created_at: user.created_at,
+      }
+    : { name: '', username: '' };
+
+  const app: AppContext = {
+    view: player.view,
+    user: appUser,
+    query: player.query,
+    setQuery: player.setQuery,
+    playlists: player.playlists,
+    activePlaylistId: player.view === 'playlist' ? player.activePlaylistId : null,
+    navigate: player.navigate,
+    openPlaylist: player.openPlaylist,
+    openCreate: player.openCreate,
+    logout: () => {
+      void player.logout();
+    },
+    back: player.back,
+    forward: player.forward,
+    canBack: player.canBack,
+    canForward: player.canForward,
+    currentTrack: player.currentTrack,
+    trackDuration: player.trackDuration,
+    isPlaying: player.isPlaying,
+    progress: player.progress,
+    volume: player.volume,
+    likedIds: player.likedIds,
+    toggleLike: player.toggleLike,
+    togglePlay: player.togglePlay,
+    prevTrack: player.prevTrack,
+    nextTrack: player.nextTrack,
+    seek: player.seek,
+    setVolume: player.setVolume,
+  };
 
   return (
-    <div className={cx('min-h-screen', dash ? 'bg-dash-bg' : 'bg-base')}>
+    <div className="min-h-screen bg-base">
       <Sidebar
-        variant={variant}
         navLabel={navLabel}
         view={app.view}
         playlists={app.playlists}
-        activePlaylistId={app.view === 'playlist' ? app.activePlaylistId : null}
+        activePlaylistId={app.activePlaylistId}
         user={app.user}
         footerHeight={footerHeight}
         onNavigate={app.navigate}
@@ -46,7 +78,6 @@ export default function AppShell({
       />
 
       <Header
-        variant={variant}
         query={app.query}
         onQueryChange={app.setQuery}
         onBack={app.back}
@@ -62,13 +93,15 @@ export default function AppShell({
       </main>
 
       <PlayerFooter
-        variant={variant}
         track={app.currentTrack}
+        total={app.trackDuration}
         isPlaying={app.isPlaying}
         progress={app.progress}
         volume={app.volume}
-        liked={app.likedIds.includes(app.currentTrack.id)}
-        onToggleLike={() => app.toggleLike(app.currentTrack.id)}
+        liked={app.currentTrack ? app.likedIds.includes(app.currentTrack.id) : false}
+        onToggleLike={() => {
+          if (app.currentTrack) app.toggleLike(app.currentTrack.id);
+        }}
         onTogglePlay={app.togglePlay}
         onPrev={app.prevTrack}
         onNext={app.nextTrack}

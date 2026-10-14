@@ -1,32 +1,39 @@
 import { useMemo, useState } from 'react';
 import { Plus, ListMusic, Play, Pause, Heart, Search, LayoutGrid, List, Sparkles } from 'lucide-react';
 import { cx } from '../lib/utils';
-import type { Playlist } from '../types';
-
-interface LibraryViewProps {
-  playlists: Playlist[];
-  currentTrackId: string;
-  isPlaying: boolean;
-  likedIds: string[];
-  onPlayTrack: (id: string) => void;
-  onOpenPlaylist: (id: string) => void;
-  onCreatePlaylist: () => void;
-}
+import { usePlayer } from '../context/PlayerContext';
+import type { Track } from '../types';
 
 const BARS = ['h-2', 'h-5', 'h-7', 'h-3', 'h-6', 'h-2', 'h-4'];
 
-export default function LibraryView({
-  playlists,
-  currentTrackId,
-  isPlaying,
-  likedIds,
-  onPlayTrack,
-  onOpenPlaylist,
-  onCreatePlaylist,
-}: LibraryViewProps) {
+export default function LibraryView() {
+  const {
+    playlists,
+    tracks,
+    currentTrackId,
+    isPlaying,
+    likedIds,
+    playTrack,
+    openPlaylist,
+    openLiked,
+    openCreate,
+    togglePlay,
+  } = usePlayer();
+
   const [filter, setFilter] = useState<'all' | 'playlists' | 'liked'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  const firstStreamable = (ids: string[]): string | undefined =>
+    ids.find((id) => tracks.find((track) => track.id === id)?.videoId);
+
+  const listFor = (ids: string[]): Track[] =>
+    ids
+      .map((id) => tracks.find((track) => track.id === id))
+      .filter((track): track is Track => track !== undefined);
+
+  const playableLikedId = firstStreamable(likedIds);
+  const likedPlaying = isPlaying && currentTrackId !== null && likedIds.includes(currentTrackId);
 
   const filteredPlaylists = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -67,7 +74,7 @@ export default function LibraryView({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={onCreatePlaylist}
+            onClick={openCreate}
             className="flex items-center gap-2 bg-primary px-5 py-2.5 text-[12px] font-bold uppercase tracking-[0.6px] text-on-primary shadow-primary transition hover:brightness-110 active:scale-95"
           >
             <Plus className="size-4" strokeWidth={3} />
@@ -146,7 +153,13 @@ export default function LibraryView({
         <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {/* Liked Songs Featured Card */}
           {showLikedCard && (
-            <div className="group relative flex flex-col justify-between overflow-hidden border border-line/60 bg-gradient-to-br from-[#3b0d17] via-card to-sunken p-5 shadow-card transition-all hover:border-primary/60 hover:bg-card">
+            <div
+              className="group relative flex cursor-pointer flex-col justify-between overflow-hidden border border-line/60 bg-gradient-to-br from-primary-deep via-card to-sunken p-5 shadow-card transition-all hover:border-primary/60 hover:bg-card"
+              onClick={openLiked}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openLiked()}
+            >
               <div>
                 <div className="mb-4 flex size-12 items-center justify-center border border-primary/30 bg-primary/20 text-primary">
                   <Heart className="size-6 fill-current" />
@@ -159,14 +172,22 @@ export default function LibraryView({
 
               <div className="mt-8 flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-muted">AUTO PLAYLIST</span>
-                {likedIds.length > 0 && (
+                {playableLikedId && (
                   <button
                     type="button"
                     aria-label="Play liked songs"
-                    onClick={() => onPlayTrack(likedIds[0])}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (likedPlaying) togglePlay();
+                      else playTrack(playableLikedId, listFor(likedIds));
+                    }}
                     className="flex size-10 items-center justify-center bg-primary text-on-primary shadow-primary transition-transform hover:scale-105 active:scale-95"
                   >
-                    <Play className="size-4" fill="currentColor" />
+                    {likedPlaying ? (
+                      <Pause className="size-4" fill="currentColor" />
+                    ) : (
+                      <Play className="size-4" fill="currentColor" />
+                    )}
                   </button>
                 )}
               </div>
@@ -177,13 +198,13 @@ export default function LibraryView({
           {showPlaylists &&
             filteredPlaylists.map((p) => {
               const count = p.trackCount ?? p.trackIds.length;
-              const hasTracks = p.trackIds.length > 0;
-              const isPlaylistPlaying = isPlaying && p.trackIds.includes(currentTrackId);
+              const playableId = firstStreamable(p.trackIds);
+              const isPlaylistPlaying = isPlaying && p.trackIds.includes(currentTrackId ?? '');
 
               return (
                 <div
                   key={p.id}
-                  onClick={() => onOpenPlaylist(p.id)}
+                  onClick={() => openPlaylist(p.id)}
                   className="group relative flex cursor-pointer flex-col border border-line/50 bg-sunken/60 p-4 transition-all hover:border-line hover:bg-card"
                 >
                   {/* Playlist Cover Art */}
@@ -217,13 +238,14 @@ export default function LibraryView({
                     )}
 
                     {/* Floating Play Button on Hover */}
-                    {hasTracks && (
+                    {playableId && (
                       <button
                         type="button"
                         aria-label={`Play ${p.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          onPlayTrack(p.trackIds[0]);
+                          if (isPlaylistPlaying) togglePlay();
+                          else playTrack(playableId, listFor(p.trackIds));
                         }}
                         className={cx(
                           'absolute bottom-2.5 right-2.5 flex size-10 items-center justify-center bg-primary text-on-primary shadow-primary transition-all duration-200 active:scale-95',
@@ -257,7 +279,10 @@ export default function LibraryView({
         <div className="flex flex-col divide-y divide-line/40 border border-line/50 bg-sunken/40">
           {showLikedCard && (
             <div
-              onClick={() => likedIds.length > 0 && onPlayTrack(likedIds[0])}
+              onClick={openLiked}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openLiked()}
               className="group flex cursor-pointer items-center justify-between p-4 transition-colors hover:bg-card"
             >
               <div className="flex items-center gap-4">
@@ -279,7 +304,7 @@ export default function LibraryView({
               return (
                 <div
                   key={p.id}
-                  onClick={() => onOpenPlaylist(p.id)}
+                  onClick={() => openPlaylist(p.id)}
                   className="group flex cursor-pointer items-center justify-between p-4 transition-colors hover:bg-card"
                 >
                   <div className="flex min-w-0 items-center gap-4">
@@ -325,7 +350,7 @@ export default function LibraryView({
           </p>
           <button
             type="button"
-            onClick={onCreatePlaylist}
+            onClick={openCreate}
             className="mt-6 flex items-center gap-2 bg-primary px-6 py-2.5 text-[12px] font-bold uppercase tracking-[0.6px] text-on-primary transition hover:brightness-110 active:scale-95"
           >
             <Plus className="size-4" strokeWidth={3} />

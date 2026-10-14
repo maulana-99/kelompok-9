@@ -1,21 +1,16 @@
-import type {
-  ApiFailure,
-  ApiSuccess,
-  AuthResponse,
-  BackendUser,
-  BackendPlaylist,
-  CreateUserRequest,
-  CreatePlaylistInput,
-  LoginRequest,
-  MusicSearchResult,
-  Track,
-} from '../types';
+export const API_URL: string =
+  (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8080/api/v1';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api/v1').replace(/\/$/, '');
-const TOKEN_KEY = 'melodi_token';
+// Backend responses always wrap the results in this envelope
+interface ApiEnvelope<T> {
+  success: boolean;
+  message?: string;
+  data?: T;
+  errors?: unknown;
+}
 
 export class ApiError extends Error {
-  readonly status: number;
+  status: number;
 
   constructor(message: string, status: number) {
     super(message);
@@ -24,101 +19,36 @@ export class ApiError extends Error {
   }
 }
 
-async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T | null> {
-  const headers = new Headers(options.headers);
-  if (options.body !== undefined && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
-
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
-  const payload: ApiSuccess<T> | ApiFailure | null =
-    response.status === 204 ? null : await response.json();
-
-  if (!response.ok) {
-    const message = payload ? payload.message : `API request failed (${response.status})`;
-    throw new ApiError(message ?? `API request failed (${response.status})`, response.status);
-  }
-
-  if (!payload || !payload.success) {
-    throw new ApiError('Backend returned an invalid response.', response.status);
-  }
-
-  return payload.data ?? null;
+interface RequestOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  body?: unknown;
+  token?: string | null;
 }
 
-export async function login(credentials: LoginRequest): Promise<AuthResponse> {
-  const auth = await apiRequest<AuthResponse>('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(credentials),
-  });
-  if (!auth) throw new ApiError('Backend did not return an authentication session.', 500);
-  localStorage.setItem(TOKEN_KEY, auth.token);
-  return auth;
-}
+// Success -> returns the contents of data from the envelope
+// Failed -> throws ApiError with the message from the backend
+export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { method = 'GET', body, token } = options;
 
-export async function createUser(user: CreateUserRequest): Promise<BackendUser> {
-  const createdUser = await apiRequest<BackendUser>('/users', {
-    method: 'POST',
-    body: JSON.stringify(user),
-  });
-  if (!createdUser) throw new ApiError('Backend did not return the created user.', 500);
-  return createdUser;
-}
-
-export async function logout(): Promise<null> {
+  let res: Response;
   try {
-    await apiRequest<null>('/auth/logout', { method: 'POST' });
-    return null;
-  } finally {
-    localStorage.removeItem(TOKEN_KEY);
+    res = await fetch(`${API_URL}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError('Tidak bisa terhubung ke server', 0);
   }
-}
 
-export async function getMe(): Promise<BackendUser> {
-  const user = await apiRequest<BackendUser>('/auth/me');
-  if (!user) throw new ApiError('Backend did not return current user profile.', 401);
-  return user;
-}
+  const payload = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
 
-export async function searchMusic(query: string, limit = 20): Promise<MusicSearchResult[]> {
-  const params = new URLSearchParams({ q: query, limit: String(limit) });
-  const results = await apiRequest<MusicSearchResult[]>(`/music/search?${params.toString()}`);
-  if (!results) throw new ApiError('Backend did not return search results.', 500);
-  return results;
-}
+  if (!res.ok || !payload?.success) {
+    throw new ApiError(payload?.message ?? 'Terjadi kesalahan', res.status);
+  }
 
-export async function listPlaylists(): Promise<BackendPlaylist[]> {
-  const playlists = await apiRequest<BackendPlaylist[]>('/playlists');
-  if (!playlists) throw new ApiError('Backend did not return playlists.', 500);
-  return playlists;
-}
-
-export async function createPlaylist(input: CreatePlaylistInput, tracks: Track[]): Promise<BackendPlaylist> {
-  const selectedTracks = input.trackIds.map((id) => tracks.find((track) => track.id === id)).filter(
-    (track): track is Track => track !== undefined,
-  );
-  const playlist = await apiRequest<BackendPlaylist>('/playlists', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: input.name,
-      description: input.description,
-      cover: input.cover,
-      tracks: selectedTracks,
-    }),
-  });
-  if (!playlist) throw new ApiError('Backend did not return the created playlist.', 500);
-  return playlist;
-}
-
-export function hasAuthToken(): boolean {
-  return localStorage.getItem(TOKEN_KEY) !== null;
-}
-
-export function clearAuthToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+  return payload.data as T;
 }

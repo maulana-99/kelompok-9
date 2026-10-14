@@ -7,7 +7,7 @@ const COLS = 'grid grid-cols-[62px_minmax(0,1fr)_220px_141px_62px] items-center 
 
 interface TrackListProps {
   tracks: Track[];
-  currentTrackId: string;
+  currentTrackId: string | null;
   isPlaying: boolean;
   likedIds: string[];
   onPlay: (id: string) => void;
@@ -39,17 +39,23 @@ export default function TrackList({
         {tracks.map((t, i) => {
           const active = t.id === currentTrackId;
           const liked = likedIds.includes(t.id);
+          const streamable = Boolean(t.videoId);
           return (
             <div
               key={t.id}
               role="button"
-              tabIndex={0}
-              onClick={() => onPlay(t.id)}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPlay(t.id)}
+              tabIndex={streamable ? 0 : -1}
+              aria-disabled={!streamable}
+              title={streamable ? undefined : 'Tidak tersedia untuk diputar'}
+              onClick={() => streamable && onPlay(t.id)}
+              onKeyDown={(e) => streamable && (e.key === 'Enter' || e.key === ' ') && onPlay(t.id)}
               className={cx(
                 COLS,
-                'h-14 cursor-pointer border-b border-line/20 px-4 transition-colors',
-                active ? 'bg-card' : 'hover:bg-card/60',
+                'h-14 border-b border-line/20 px-4 transition-colors',
+                !streamable
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'cursor-pointer',
+                active ? 'bg-card' : streamable && 'hover:bg-card/60',
               )}
             >
               <div className="flex items-center justify-center text-[14px] leading-5 text-muted">

@@ -1,12 +1,11 @@
-import { Music, MoreVertical } from 'lucide-react';
+import { Music } from 'lucide-react';
 import { cx } from '../lib/utils';
-import { getTrack } from '../data/mock';
 import Equalizer from './Equalizer';
-import type { recentlyPlayed } from '../data/mock';
+import type { Track } from '../types';
 
 interface RecentTrackListProps {
-  items: typeof recentlyPlayed;
-  currentTrackId: string;
+  items: Track[];
+  currentTrackId: string | null;
   isPlaying: boolean;
   onPlay: (id: string) => void;
 }
@@ -18,65 +17,66 @@ export default function RecentTrackList({
   isPlaying,
   onPlay,
 }: RecentTrackListProps) {
+  if (items.length === 0) {
+    return (
+      <div className="border border-line/40 bg-card px-8 py-10 text-center">
+        <p className="text-[14px] leading-5 text-muted">
+          Belum ada lagu yang diputar. Cari lagu di halaman Search lalu tekan play — lagu yang kamu
+          putar akan muncul di sini.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col border border-dash-line/40 bg-dash-card p-[9px]">
-      {items.map((item, i) => {
-        const track = getTrack(item.trackId);
-        if (!track) return null;
+    <div className="flex flex-col border border-line/40 bg-card p-[9px]">
+      {items.map((track, i) => {
         const active = track.id === currentTrackId;
         return (
           <div
-            key={item.trackId}
+            key={track.id}
             role="button"
             tabIndex={0}
             onClick={() => onPlay(track.id)}
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPlay(track.id)}
             className={cx(
               'flex cursor-pointer items-center px-4 py-[10px] transition-colors',
-              i > 0 && 'border-t border-dash-line/30 pt-[11px]',
-              active ? 'bg-dash-hover' : 'hover:bg-dash-hover/60',
+              i > 0 && 'border-t border-line/30 pt-[11px]',
+              active ? 'bg-hover' : 'hover:bg-hover/60',
             )}
           >
             <div className="flex min-w-0 flex-1 items-center gap-4">
-              <div className="flex w-5 items-center justify-center text-[12px] font-medium leading-4 text-dash-muted">
+              <div className="flex w-5 items-center justify-center text-[12px] font-medium leading-4 text-muted">
                 {active ? <Equalizer playing={isPlaying} /> : i + 1}
               </div>
               <div
                 className={cx(
-                  'flex size-10 shrink-0 items-center justify-center border bg-dash-line shadow-sm',
-                  active ? 'border-primary/40 ring-1 ring-primary/30' : 'border-dash-line2',
+                  'flex size-10 shrink-0 items-center justify-center border bg-line shadow-sm',
+                  active ? 'border-primary/40 ring-1 ring-primary/30' : 'border-line',
                 )}
               >
-                <Music className={cx('size-[13px]', active ? 'text-primary' : 'text-dash-muted')} />
+                <Music className={cx('size-[13px]', active ? 'text-primary' : 'text-muted')} />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className={cx('truncate text-[14px] font-semibold leading-5', active ? 'text-primary-soft' : 'text-dash-ink')}>
+                  <p className={cx('truncate text-[14px] font-semibold leading-5', active ? 'text-primary-soft' : 'text-ink')}>
                     {track.title}
                   </p>
                   {active && (
-                    <span className="bg-primary px-2 py-[2px] text-[10px] font-semibold leading-[15px] text-dash-on-primary">
+                    <span className="bg-primary px-2 py-[2px] text-[10px] font-semibold leading-[15px] text-on-primary">
                       Playing
                     </span>
                   )}
                 </div>
-                <p className={cx('truncate text-[12px] leading-4', active ? 'text-dash-dim' : 'text-dash-muted')}>
-                  {item.subtitle}
+                <p className={cx('truncate text-[12px] leading-4', active ? 'text-dim' : 'text-muted')}>
+                  {track.album && track.album !== '-' ? `${track.artist} — ${track.album}` : track.artist}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-6">
-              <span className={cx('text-[12px] leading-4', active ? 'font-medium text-primary-soft' : 'text-dash-muted')}>
+              <span className={cx('text-[12px] leading-4', active ? 'font-medium text-primary-soft' : 'text-muted')}>
                 {track.duration}
               </span>
-              <button
-                type="button"
-                aria-label="More options"
-                onClick={(e) => e.stopPropagation()}
-                className="px-1 pb-[10px] pt-1 text-dash-muted hover:text-primary"
-              >
-                <MoreVertical className="size-3" />
-              </button>
             </div>
           </div>
         );
