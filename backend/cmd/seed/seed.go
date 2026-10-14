@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"backend/internal/config"
 	"backend/internal/database"
 	"backend/internal/model"
@@ -16,18 +18,36 @@ func main() {
 		log.Fatalf("Gagal konek ke database: %v", err)
 	}
 
-	// 2. Buat data User Dummy
+	// 2. Buat data User Dummy (password di-hash bcrypt, sama seperti register)
+	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	if err != nil {
+		log.Fatalf("Gagal hash password: %v", err)
+	}
+
 	users := []model.User{
-		{ID: 1, Name: "Alice", Username: "alice", Password: "password123"},
-		{ID: 2, Name: "Bob", Username: "bob", Password: "password123"},
+		{Name: "Alice", Username: "alice"},
+		{Name: "Bob", Username: "bob"},
 	}
 
-	for _, u := range users {
-		db.FirstOrCreate(&u, model.User{ID: u.ID})
+	// ID tidak di-hardcode supaya sequence SERIAL tetap sinkron.
+	// Assign memperbarui password lama yang masih plaintext.
+	for i := range users {
+		err := db.Where(model.User{Username: users[i].Username}).
+			Assign(model.User{Name: users[i].Name, Password: string(hash)}).
+			FirstOrCreate(&users[i]).Error
+		if err != nil {
+			log.Fatalf("Gagal seed user %s: %v", users[i].Username, err)
+		}
 	}
 
-	// 3. Buat relasi Follow (User 1 follow User 2)
-	db.Exec("INSERT INTO follow (follower_id, following_id) VALUES (?, ?) ON CONFLICT DO NOTHING", 1, 2)
+	// 3. Buat relasi Follow (Alice follow Bob)
+	err = db.Exec(
+		"INSERT INTO follow (follower_id, following_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+		users[0].ID, users[1].ID,
+	).Error
+	if err != nil {
+		log.Fatalf("Gagal seed follow: %v", err)
+	}
 
 	log.Println("Berhasil memasukkan data dummy!")
 }
