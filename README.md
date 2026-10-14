@@ -6,7 +6,7 @@ Aplikasi musik (playlist, follow, riwayat dengar) dengan backend REST API dan fr
 |---|---|
 | Backend | Go 1.27 + Gin + GORM |
 | Database | PostgreSQL 18 (minimal 13) |
-| Frontend | React 19 + TypeScript + Vite 5 + Tailwind CSS 3 |
+| Frontend | React 19 + TypeScript + Vite 8 + Tailwind CSS 3 |
 
 Panduan ini berlaku untuk **Windows, macOS, dan Linux**. Perintah yang berbeda antar-OS ditulis terpisah:
 
@@ -50,7 +50,7 @@ kelompok-9/
 | Tool | Versi | Catatan |
 |---|---|---|
 | Go | ≥ 1.27 | Go ≥ 1.21 otomatis mengunduh toolchain sesuai `go.mod` |
-| Node.js | ≥ 18 | sesuai Vite 5; npm ikut terpasang |
+| Node.js | ≥ 20.19 atau ≥ 22.12 | syarat Vite 8; npm ikut terpasang |
 | PostgreSQL | 18 (minimal 13) | perlu `psql` di `PATH` |
 | Git | terbaru | |
 
@@ -336,23 +336,6 @@ Semua response memakai format seragam:
 | DELETE | `/api/v1/users/:id` | Bearer | hapus user |
 
 Endpoint ber-auth butuh header `Authorization: Bearer <token>`. Tanpa token valid → `401 belum login`.
-
-### Playlist dan pencarian musik
-
-| Method | Endpoint | Auth | Keterangan |
-|---|---|---|---|
-| GET | `/api/v1/music/search?q=&limit=` | – | pencarian lagu untuk halaman Search |
-| GET | `/api/v1/music/:musicId/stream` | – | stream audio |
-| GET | `/api/v1/music/thumb?url=` | – | proxy thumbnail |
-| GET | `/api/v1/playlists` | Ya | daftar playlist milik user login |
-| GET | `/api/v1/playlists/:id` | Ya | detail playlist milik user login |
-| POST | `/api/v1/playlists` | Ya | simpan playlist dan lagu pilihan |
-
-`POST /api/v1/playlists` menerima `name`, `description`, `cover`, dan `tracks`.
-Setiap track memakai `id`, `title`, `artist`, `album`, `duration`, `explicit`,
-`added`, `videoId`, dan `thumbnail` seperti data frontend. Response playlist
-memuat `track_ids`, `tracks`, `track_count`, dan `duration_label`. Playlist hanya
-bisa dibaca oleh pemilik akun; ID playlist dapat dikirim sebagai `p<ID>` atau angka.
 
 ### POST /api/v1/users
 
