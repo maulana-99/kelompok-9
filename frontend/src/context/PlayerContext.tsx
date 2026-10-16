@@ -4,14 +4,14 @@ import { useAuth } from './AuthContext';
 import { streamUrl } from '../lib/music';
 import { toDurationLabel, toSeconds } from '../lib/utils';
 import ModalCreatePlaylist from '../components/ModalCreatePlaylist';
-import type { AppView, CreatePlaylistInput, Playlist, Track } from '../types';
+import type { AppView, CreatePlaylistInput, NavTarget, Playlist, Track } from '../types';
 
 /** Seluruh state + aksi yang dipakai halaman dan kerangka aplikasi. */
 export interface PlayerStore {
   // Navigasi
   view: AppView;
   activePlaylistId: string | null;
-  navigate: (target: 'home' | 'search' | 'library' | 'liked-songs') => void;
+  navigate: (target: NavTarget) => void;
   openPlaylist: (id: string) => void;
   openLiked: () => void;
   openCreate: () => void;
@@ -124,11 +124,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     ? 'playlist'
     : pathname === '/search'
       ? 'search'
-      : pathname === '/library'
-        ? 'library'
-        : pathname === '/liked-songs'
-          ? 'liked-songs'
-          : 'home';
+      : pathname.startsWith('/explore')
+        ? 'explore'
+        : pathname === '/library'
+          ? 'library'
+          : pathname === '/liked-songs'
+            ? 'liked-songs'
+            : 'home';
   const activePlaylistId = pathname.startsWith('/playlist/') ? pathname.replace('/playlist/', '') : null;
 
   // ---- Audio: muat ulang saat lagu berganti ----
@@ -168,12 +170,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [volume]);
 
   // ---- Navigasi ----
-  const navigateTo = (target: 'home' | 'search' | 'library' | 'liked-songs') => {
+  const navigateTo = (target: NavTarget) => {
     if (target === 'home') {
       setQueryState('');
       navigate('/');
     } else if (target === 'search') {
       navigate('/search');
+    } else if (target === 'explore') {
+      navigate('/explore');
     } else if (target === 'library') {
       navigate('/library');
     } else {

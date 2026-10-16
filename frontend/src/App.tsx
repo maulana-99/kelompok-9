@@ -9,6 +9,9 @@ import LibraryView from './pages/LibraryView';
 import LoginView from './pages/LoginView';
 import PlaylistView from './pages/PlaylistView';
 import SearchView from './pages/SearchView';
+import ExploreView from './pages/ExploreView';
+import GenreView from './pages/GenreView';
+import ExplorePlaylistView from './pages/ExplorePlaylistView';
 import LikedSongs from './pages/likedSongs';
 
 import './index.css';
@@ -56,6 +59,39 @@ function App() {
                 <RequireAuth>
                   <AppShell autoFocusSearch>
                     <SearchView />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/explore"
+              element={
+                <RequireAuth>
+                  <AppShell>
+                    <ExploreView />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/explore/playlist/:playlistId"
+              element={
+                <RequireAuth>
+                  <AppShell>
+                    <ExplorePlaylistView />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/explore/:genreId"
+              element={
+                <RequireAuth>
+                  <AppShell>
+                    <GenreView />
                   </AppShell>
                 </RequireAuth>
               }

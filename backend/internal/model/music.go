@@ -14,3 +14,33 @@ type MusicResult struct {
 	Thumbnail string `json:"thumbnail"`
 	Duration  string `json:"duration"`
 }
+
+// MusicGenre adalah kategori jelajah YouTube Music (genre atau mood).
+// ID adalah "params" browse milik YouTube, dipakai di GET /music/genres/:genreId.
+type MusicGenre struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Group string `json:"group"` // "mood" atau "genre"
+}
+
+// MusicPlaylist adalah playlist YouTube Music (bukan playlist lokal user).
+type MusicPlaylist struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Subtitle  string `json:"subtitle,omitempty"`
+	Thumbnail string `json:"thumbnail"`
+}
+
+// MusicGenreDetail berisi playlist-playlist di dalam satu genre/mood.
+type MusicGenreDetail struct {
+	Name      string          `json:"name"`
+	Playlists []MusicPlaylist `json:"playlists"`
+}
+
+// MusicPlaylistDetail berisi lagu-lagu di dalam satu playlist YouTube Music.
+type MusicPlaylistDetail struct {
+	ID        string        `json:"id"`
+	Title     string        `json:"title"`
+	Thumbnail string        `json:"thumbnail"`
+	Tracks    []MusicResult `json:"tracks"`
+}

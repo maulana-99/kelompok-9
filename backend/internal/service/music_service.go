@@ -55,6 +55,12 @@ type MusicService interface {
 	OpenStream(ctx context.Context, videoID, rangeHeader string) (*http.Response, error)
 	// OpenThumbnail retrieves thumbnail images.
 	OpenThumbnail(ctx context.Context, rawURL string) (*http.Response, error)
+	// Genres lists the YouTube Music browse categories (moods and genres).
+	Genres(ctx context.Context) ([]model.MusicGenre, error)
+	// GenrePlaylists lists the YouTube Music playlists inside one category.
+	GenrePlaylists(ctx context.Context, genreID string) (*model.MusicGenreDetail, error)
+	// Playlist returns the tracks of one YouTube Music playlist.
+	Playlist(ctx context.Context, playlistID string) (*model.MusicPlaylistDetail, error)
 }
 
 type musicService struct {
@@ -66,6 +72,10 @@ type musicService struct {
 	// Cache the stream URL for each video ID so that yt-dlp isn't called for every range request.
 	mu      sync.Mutex
 	streams map[string]streamEntry
+
+	// Cache browse responses (genres, playlists): same data for every user.
+	browseMu    sync.Mutex
+	browseCache map[string]browseEntry
 }
 
 type streamEntry struct {
@@ -78,6 +88,7 @@ func NewMusicService() MusicService {
 		searchClient: &http.Client{Timeout: 15 * time.Second},
 		streamClient: &http.Client{},
 		streams:      make(map[string]streamEntry),
+		browseCache:  make(map[string]browseEntry),
 	}
 }
 
@@ -152,6 +163,23 @@ type ytMusicListItem struct {
 	PlaylistItemData *struct {
 		VideoID string `json:"videoId"`
 	} `json:"playlistItemData"`
+	Overlay *struct {
+		MusicItemThumbnailOverlayRenderer *struct {
+			Content *struct {
+				MusicPlayButtonRenderer *struct {
+					PlayNavigationEndpoint *struct {
+						WatchEndpoint *struct {
+							WatchEndpointMusicSupportedConfigs *struct {
+								WatchEndpointMusicConfig *struct {
+									MusicVideoType string `json:"musicVideoType"`
+								} `json:"watchEndpointMusicConfig"`
+							} `json:"watchEndpointMusicSupportedConfigs"`
+						} `json:"watchEndpoint"`
+					} `json:"playNavigationEndpoint"`
+				} `json:"musicPlayButtonRenderer"`
+			} `json:"content"`
+		} `json:"musicItemThumbnailOverlayRenderer"`
+	} `json:"overlay"`
 }
 
 // ytItem pairs a search item with the type ("song"/"video") derived from the
@@ -235,28 +263,36 @@ func (s *musicService) Search(ctx context.Context, query string, limit int) ([]m
 
 // fetchSearch calls the innertube search API (empty params = no filter).
 func (s *musicService) fetchSearch(ctx context.Context, query, params string) (*ytSearchResponse, error) {
-	body := map[string]any{
-		"context": map[string]any{
-			"client": map[string]any{
-				"clientName":    "WEB_REMIX",
-				"clientVersion": "1.20240401.01.00",
-				"hl":            "id",
-				"gl":            "ID",
-			},
-		},
-		"query": query,
-	}
+	body := map[string]any{"query": query}
 	if params != "" {
 		body["params"] = params
 	}
-	payload, err := json.Marshal(body)
-	if err != nil {
+	var parsed ytSearchResponse
+	if err := s.callInnertube(ctx, ytmSearchURL, body, &parsed); err != nil {
 		return nil, err
 	}
+	return &parsed, nil
+}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ytmSearchURL, strings.NewReader(string(payload)))
+// callInnertube POSTs body (plus the WEB_REMIX client context) to an innertube
+// endpoint and decodes the JSON response into out.
+func (s *musicService) callInnertube(ctx context.Context, endpoint string, body map[string]any, out any) error {
+	body["context"] = map[string]any{
+		"client": map[string]any{
+			"clientName":    "WEB_REMIX",
+			"clientVersion": "1.20240401.01.00",
+			"hl":            "id",
+			"gl":            "ID",
+		},
+	}
+	payload, err := json.Marshal(body)
 	if err != nil {
-		return nil, err
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
@@ -265,19 +301,14 @@ func (s *musicService) fetchSearch(ctx context.Context, query, params string) (*
 
 	res, err := s.searchClient.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("youtube music search gagal: status %d", res.StatusCode)
+		return &upstreamStatusError{code: res.StatusCode}
 	}
-
-	var parsed ytSearchResponse
-	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
-		return nil, err
-	}
-	return &parsed, nil
+	return json.NewDecoder(res.Body).Decode(out)
 }
 
 // collectItems gathers all items with a potential videoId from the two

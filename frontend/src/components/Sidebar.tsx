@@ -1,6 +1,6 @@
-import { Home, Search, Library, Heart, Plus, Settings, LogOut, User } from 'lucide-react';
+import { Home, Search, Compass, Library, Heart, Plus, Settings, LogOut, User } from 'lucide-react';
 import { cx } from '../lib/utils';
-import type { AppUser, AppView, Playlist } from '../types';
+import type { AppUser, AppView, NavTarget, Playlist } from '../types';
 
 interface SidebarProps {
   navLabel?: string;
@@ -9,7 +9,7 @@ interface SidebarProps {
   activePlaylistId: string | null;
   user: AppUser;
   footerHeight: number;
-  onNavigate: (target: 'home' | 'search' | 'library' | 'liked-songs') => void;
+  onNavigate: (target: NavTarget) => void;
   onOpenPlaylist: (id: string) => void;
   onCreatePlaylist: () => void;
   onLogout: () => void;
@@ -31,6 +31,7 @@ export default function Sidebar({
   const navItems = [
     { key: 'home', label: 'Home', icon: Home, target: 'home' },
     { key: 'search', label: 'Search', icon: Search, target: 'search' },
+    { key: 'explore', label: 'Explore', icon: Compass, target: 'explore' },
     { key: 'library', label: 'Your Library', icon: Library, target: 'library' },
     { key: 'liked-songs', label: 'Liked Songs', icon: Heart, target: 'liked-songs' },
   ] as const;
