@@ -11,6 +11,7 @@ interface SidebarProps {
   footerHeight: number;
   onNavigate: (target: 'home' | 'search' | 'library' | 'liked-songs') => void;
   onOpenPlaylist: (id: string) => void;
+  onOpenProfile: (id: number) => void;
   onCreatePlaylist: () => void;
   onLogout: () => void;
 }
@@ -25,6 +26,7 @@ export default function Sidebar({
   footerHeight,
   onNavigate,
   onOpenPlaylist,
+  onOpenProfile,
   onCreatePlaylist,
   onLogout,
 }: SidebarProps) {
@@ -121,14 +123,23 @@ export default function Sidebar({
       {/* Profile */}
       <div className="shrink-0 border-t border-line/40 bg-sunken px-4 pb-4 pt-[17px]">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (user.id != null) onOpenProfile(user.id);
+            }}
+            disabled={user.id == null}
+            title={user.id != null ? 'Open your profile' : undefined}
+            className="flex min-w-0 items-center gap-3 text-left transition-colors hover:opacity-80 disabled:cursor-default disabled:opacity-100"
+          >
             <div className="flex size-8 items-center justify-center border border-primary-soft/30 bg-primary-soft/20 text-primary-soft">
               <User className="size-[13px]" strokeWidth={2} />
             </div>
-            <div>
-              <p className="-mt-px text-[14px] font-medium leading-[17.5px] text-ink">{user.name}</p>
+            <div className="min-w-0">
+              <p className="-mt-px truncate text-[14px] font-medium leading-[17.5px] text-ink">{user.name}</p>
+              {user.username && <p className="truncate text-[11px] leading-4 text-muted">@{user.username}</p>}
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-1 text-muted">
             <button type="button" aria-label="Settings" className="p-[6px] hover:text-primary">
               <Settings className="size-[13.5px]" />

@@ -14,6 +14,7 @@ export interface PlayerStore {
   navigate: (target: 'home' | 'search' | 'library' | 'liked-songs') => void;
   openPlaylist: (id: string) => void;
   openLiked: () => void;
+  openProfile: (id: number | string) => void;
   openCreate: () => void;
   back: () => void;
   forward: () => void;
@@ -122,13 +123,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const view: AppView = pathname.startsWith('/playlist/')
     ? 'playlist'
-    : pathname === '/search'
-      ? 'search'
-      : pathname === '/library'
-        ? 'library'
-        : pathname === '/liked-songs'
-          ? 'liked-songs'
-          : 'home';
+    : pathname.startsWith('/users/')
+      ? 'profile'
+      : pathname === '/search'
+        ? 'search'
+        : pathname === '/library'
+          ? 'library'
+          : pathname === '/liked-songs'
+            ? 'liked-songs'
+            : 'home';
   const activePlaylistId = pathname.startsWith('/playlist/') ? pathname.replace('/playlist/', '') : null;
 
   // ---- Audio: muat ulang saat lagu berganti ----
@@ -183,6 +186,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const openPlaylist = (id: string) => navigate(`/playlist/${id}`);
   const openLiked = () => navigate('/liked-songs');
+  const openProfile = (id: number | string) => navigate(`/users/${id}`);
   const openCreate = () => setShowCreate(true);
 
   const setQuery = (value: string) => {
@@ -309,6 +313,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     navigate: navigateTo,
     openPlaylist,
     openLiked,
+    openProfile,
     openCreate,
     back: () => navigate(-1),
     forward: () => navigate(1),

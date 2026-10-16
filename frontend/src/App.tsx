@@ -8,6 +8,7 @@ import HomeView from './pages/HomeView';
 import LibraryView from './pages/LibraryView';
 import LoginView from './pages/LoginView';
 import PlaylistView from './pages/PlaylistView';
+import ProfileView from './pages/ProfileView';
 import SearchView from './pages/SearchView';
 import LikedSongs from './pages/likedSongs';
 
@@ -78,6 +79,17 @@ function App() {
                 <RequireAuth>
                   <AppShell>
                     <PlaylistView />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/users/:userId"
+              element={
+                <RequireAuth>
+                  <AppShell>
+                    <ProfileView />
                   </AppShell>
                 </RequireAuth>
               }

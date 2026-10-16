@@ -95,7 +95,7 @@ export interface AppUser {
   created_at?: string;
 }
 
-export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library' | 'liked-songs';
+export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library' | 'liked-songs' | 'profile';
 
 export interface NavigationEntry {
   view: AppView;
@@ -111,6 +111,7 @@ export interface AppContext {
   activePlaylistId: string | null;
   navigate: (target: 'home' | 'search' | 'library' | 'liked-songs') => void;
   openPlaylist: (id: string) => void;
+  openProfile: (id: number | string) => void;
   openCreate: () => void;
   logout: () => void;
   back: () => void;

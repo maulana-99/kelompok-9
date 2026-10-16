@@ -28,6 +28,7 @@ interface AuthContextValue {
   login: (username: string, password: string) => Promise<void>;
   signup: (name: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const STORAGE_KEY = 'melodi_auth';
@@ -131,6 +132,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [session]);
 
+  const refresh = useCallback(async () => {
+    const stored = readStorage();
+    if (!stored) return;
+    const user = await api<User>('/auth/me', { token: stored.token });
+    const next: StoredSession = { token: stored.token, user };
+    setSession(next);
+    writeStorage(next);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: session?.user ?? null,
@@ -139,8 +149,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       signup,
       logout,
+      refresh,
     }),
-    [session, ready, login, signup, logout],
+    [session, ready, login, signup, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
