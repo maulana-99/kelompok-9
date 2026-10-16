@@ -26,6 +26,13 @@ func New(db *gorm.DB) *gin.Engine {
 	authHandler := handler.NewAuthHandler(authService)
 	requireAuth := middleware.Auth(authService)
 
+	playlistRepo := repository.NewPlaylistRepository(db)
+	playlistSongRepo := repository.NewPlaylistSongRepository(db)
+	playlistService := service.NewPlaylistService(playlistRepo, playlistSongRepo)
+	playlistSongService := service.NewPlaylistSongService(playlistRepo, playlistSongRepo)
+	playlistHandler := handler.NewPlaylistHandler(playlistService, authService)
+	playlistSongHandler := handler.NewPlaylistSongHandler(playlistSongService, authService)
+
 	v1 := r.Group("/api/v1")
 	{
 		auth := v1.Group("/auth")
@@ -41,7 +48,20 @@ func New(db *gorm.DB) *gin.Engine {
 			users.GET("", userHandler.GetAll)
 			users.GET("/:id", userHandler.GetByID)
 
-		// --- Wiring dependency for the music resource (scraping YouTube Music and no local tables) ---
+			// Extra followers & following endpoints
+			users.GET("/:id/followers", userHandler.GetFollowers)
+			users.GET("/:id/following", userHandler.GetFollowing)
+
+			// Follow & unfollow endpoints (login required)
+			users.POST("/:id/follow", requireAuth, userHandler.Follow)
+			users.DELETE("/:id/follow", requireAuth, userHandler.Unfollow)
+
+			// requireAuth for update and delete
+			users.PUT("/:id", requireAuth, userHandler.Update)
+			users.DELETE("/:id", requireAuth, userHandler.Delete)
+		}
+
+		// --- Music (YouTube Music scraping, no local tables) ---
 		musicService := service.NewMusicService()
 		musicHandler := handler.NewMusicHandler(musicService)
 
@@ -52,24 +72,26 @@ func New(db *gorm.DB) *gin.Engine {
 			music.GET("/:musicId/stream", musicHandler.Stream)
 		}
 
-		// Tambahkan resource lain di sini, contoh:
+		// --- Playlists & songs inside playlists (API design 5 & 6) ---
+		playlists := v1.Group("/playlists")
+		{
+			playlists.POST("", requireAuth, playlistHandler.Create)
+			playlists.GET("", playlistHandler.List)
+			playlists.GET("/:id", playlistHandler.GetByID)
+			playlists.PUT("/:id", requireAuth, playlistHandler.Update)
+			playlists.DELETE("/:id", requireAuth, playlistHandler.Delete)
+
+			playlists.GET("/:id/songs", playlistSongHandler.List)
+			playlists.POST("/:id/songs", requireAuth, playlistSongHandler.Add)
+			playlists.DELETE("/:id/songs/:songId", requireAuth, playlistSongHandler.Delete)
+		}
+
+		// Add other resources here, e.g.:
 		// products := v1.Group("/products")
 		// {
 		// 	products.GET("", productHandler.GetAll)
 		// 	...
 		// }
-			// Endpoint tambahan followers & following
-			users.GET("/:id/followers", userHandler.GetFollowers)
-			users.GET("/:id/following", userHandler.GetFollowing)
-			
-			// Endpoint follow & unfollow (butuh login)
-			users.POST("/:id/follow", requireAuth, userHandler.Follow)
-			users.DELETE("/:id/follow", requireAuth, userHandler.Unfollow)
-
-			// Menggunakan requireAuth untuk update dan delete
-			users.PUT("/:id", requireAuth, userHandler.Update)
-			users.DELETE("/:id", requireAuth, userHandler.Delete)
-		}
 	}
 
 	return r
