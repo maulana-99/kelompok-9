@@ -1,4 +1,6 @@
+import { useNavigate } from 'react-router-dom';
 import { Heart, Play, Pause } from 'lucide-react';
+import EmptyState from '../components/EmptyState';
 import { cx, toDurationLabel, toSeconds } from '../lib/utils';
 import TrackList from '../components/TrackList';
 import { usePlayer } from '../context/PlayerContext';
@@ -7,6 +9,7 @@ import { usePlayer } from '../context/PlayerContext';
 export default function LikedSongs() {
   const { likedTracks: tracks, currentTrackId, isPlaying, likedIds, playTrack, toggleLike, togglePlay } = usePlayer();
 
+  const navigate = useNavigate();
   const playable = tracks.filter((track) => track.videoId);
   const listPlaying = isPlaying && playable.some((track) => track.id === currentTrackId);
   const canPlay = listPlaying || playable.length > 0;
@@ -21,14 +24,14 @@ export default function LikedSongs() {
     <div>
       {/* Hero */}
       <section className="bg-gradient-to-b from-primary/15 via-primary/5 to-transparent">
-        <div className="flex flex-col gap-7 p-8 sm:flex-row sm:items-end">
-          <div className="flex size-56 shrink-0 items-center justify-center border border-line/60 bg-gradient-to-br from-primary to-primary-deep shadow-card">
+        <div className="flex flex-col gap-6 p-4 sm:flex-row sm:items-end sm:gap-7 sm:p-8">
+          <div className="flex size-40 shrink-0 sm:size-56 items-center justify-center border border-line/60 bg-gradient-to-br from-primary to-primary-deep shadow-card">
             <Heart className="size-16 text-on-primary" fill="currentColor" strokeWidth={1.2} />
           </div>
           <div className="min-w-0 flex-1">
             <p className="pb-1 text-[12px] font-semibold uppercase leading-4 tracking-[1.2px] text-muted">PLAYLIST</p>
-            <h1 className="pb-1 text-[48px] font-bold leading-[48px] tracking-[-1.2px] text-ink">Liked Songs</h1>
-            <p className="max-w-[672px] pb-4 pt-3 text-[16px] leading-[23px] text-dim">
+            <h1 className="break-words pb-1 text-[32px] font-bold leading-10 tracking-[-1.2px] text-ink sm:text-[48px] sm:leading-[48px]">Liked Songs</h1>
+            <p className="max-w-[672px] pb-4 pt-2 text-[14px] leading-5 text-dim sm:pt-3 sm:text-[16px] sm:leading-[23px]">
               {tracks.length === 0
                 ? 'Lagu yang kamu beri tanda hati akan muncul di sini.'
                 : `${tracks.length} lagu yang kamu sukai.`}
@@ -67,9 +70,14 @@ export default function LikedSongs() {
             onToggleLike={toggleLike}
           />
         ) : (
-          <p className="px-8 py-12 text-center text-[14px] text-muted">
-            Belum ada lagu yang disukai. Buka Search lalu tekan tombol hati pada lagu favoritmu.
-          </p>
+          <div className="px-4 sm:px-8">
+            <EmptyState
+              icon={Heart}
+              title="Belum ada lagu yang disukai"
+              text="Tekan tombol hati pada lagu favoritmu, lagunya akan tersimpan di sini."
+              action={{ label: 'Cari lagu', onClick: () => navigate('/search') }}
+            />
+          </div>
         )}
       </section>
     </div>

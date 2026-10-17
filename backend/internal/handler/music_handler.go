@@ -105,3 +105,44 @@ func (h *MusicHandler) Stream(c *gin.Context) {
 
 	_, _ = io.Copy(c.Writer, upstream.Body)
 }
+
+// GET /api/v1/music/genres
+func (h *MusicHandler) Genres(c *gin.Context) {
+	genres, err := h.service.Genres(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusBadGateway, "gagal mengambil daftar genre", err.Error())
+		return
+	}
+	response.Success(c, http.StatusOK, "berhasil mengambil daftar genre", genres)
+}
+
+// GET /api/v1/music/genres/:genreId
+func (h *MusicHandler) GenrePlaylists(c *gin.Context) {
+	detail, err := h.service.GenrePlaylists(c.Request.Context(), c.Param("genreId"))
+	if err != nil {
+		respondBrowseError(c, err, "genre", "gagal mengambil playlist genre")
+		return
+	}
+	response.Success(c, http.StatusOK, "berhasil mengambil playlist genre", detail)
+}
+
+// GET /api/v1/music/playlists/:playlistId
+func (h *MusicHandler) Playlist(c *gin.Context) {
+	detail, err := h.service.Playlist(c.Request.Context(), c.Param("playlistId"))
+	if err != nil {
+		respondBrowseError(c, err, "playlist", "gagal mengambil isi playlist")
+		return
+	}
+	response.Success(c, http.StatusOK, "berhasil mengambil isi playlist", detail)
+}
+
+func respondBrowseError(c *gin.Context, err error, subject, fallback string) {
+	switch {
+	case errors.Is(err, service.ErrInvalidBrowseID):
+		response.Error(c, http.StatusBadRequest, subject+" id tidak valid", nil)
+	case errors.Is(err, service.ErrBrowseNotFound):
+		response.Error(c, http.StatusNotFound, subject+" tidak ditemukan", nil)
+	default:
+		response.Error(c, http.StatusBadGateway, fallback, err.Error())
+	}
+}

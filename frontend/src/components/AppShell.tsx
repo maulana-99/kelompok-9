@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import PlayerFooter from './PlayerFooter';
@@ -21,6 +22,21 @@ export default function AppShell({ navLabel, children, headerRight, autoFocusSea
   const player = usePlayer();
   const { user } = useAuth();
   const footerHeight = 76;
+  const location = useLocation();
+  // Sidebar is a drawer below the lg breakpoint.
+  const [navOpen, setNavOpen] = useState(false);
+  const [navPath, setNavPath] = useState(location.pathname);
+  if (navPath !== location.pathname) {
+    setNavPath(location.pathname);
+    setNavOpen(false);
+  }
+
+  useEffect(() => {
+    if (!navOpen) return undefined;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setNavOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
 
   const appUser: AppUser = user
     ? {
@@ -64,7 +80,16 @@ export default function AppShell({ navLabel, children, headerRight, autoFocusSea
 
   return (
     <div className="min-h-screen bg-base">
+      {navOpen && (
+        <div
+          aria-hidden="true"
+          onClick={() => setNavOpen(false)}
+          className="fixed inset-0 z-30 bg-black/60 lg:hidden"
+        />
+      )}
       <Sidebar
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
         navLabel={navLabel}
         view={app.view}
         playlists={app.playlists}
@@ -84,11 +109,12 @@ export default function AppShell({ navLabel, children, headerRight, autoFocusSea
         onForward={app.forward}
         canBack={app.canBack}
         canForward={app.canForward}
+        onMenu={() => setNavOpen(true)}
         rightSlot={headerRight}
         autoFocus={autoFocusSearch}
       />
 
-      <main className="min-h-screen pl-64 pt-16" style={{ paddingBottom: footerHeight + 36 }}>
+      <main className="min-h-screen pt-16 lg:pl-64" style={{ paddingBottom: footerHeight + 36 }}>
         {children}
       </main>
 

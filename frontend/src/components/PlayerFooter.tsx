@@ -57,10 +57,15 @@ export default function PlayerFooter({
   const ghostBtn = 'p-1 text-muted transition-colors hover:text-primary';
 
   return (
-    <footer className="fixed inset-x-0 bottom-0 z-40 flex h-[76px] items-center justify-between border-t border-line/40 bg-sunken/95 px-6 backdrop-blur-[12px]">
+    <footer className="fixed inset-x-0 bottom-0 z-30 flex h-[76px] items-center justify-between gap-3 border-t border-line/40 bg-sunken/95 px-3 backdrop-blur-[12px] sm:px-6">
+      {/* Thin progress bar on small screens (the full seek bar is hidden there) */}
+      <div className="absolute inset-x-0 top-0 h-[2px] bg-line sm:hidden">
+        <div className="h-full bg-primary" style={{ width: `${percent}%` }} />
+      </div>
+
       {/* Now playing */}
-      <div className="flex w-[308px] min-w-[200px] items-center gap-[14px]">
-        <TrackThumb track={track} className="size-12 border-line/60 bg-line" iconClassName="size-4 text-primary-soft" />
+      <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-[14px] lg:w-[308px] lg:flex-none">
+        <TrackThumb track={track} className="size-11 shrink-0 border-line/60 bg-line sm:size-12" iconClassName="size-4 text-primary-soft" />
         <div className="min-w-0">
           <div className="flex items-center gap-[6px]">
             <p className="truncate text-[14px] font-semibold leading-5 text-ink">
@@ -85,9 +90,9 @@ export default function PlayerFooter({
       </div>
 
       {/* Controls */}
-      <div className="flex w-[576px] max-w-[672px] flex-col items-center justify-center px-4">
-        <div className="flex items-center gap-5 pb-1">
-          <button type="button" aria-label="Shuffle" className={ghostBtn}>
+      <div className="flex shrink-0 flex-col items-center justify-center sm:w-[576px] sm:max-w-[672px] sm:shrink sm:px-4">
+        <div className="flex items-center gap-4 sm:gap-5 sm:pb-1">
+          <button type="button" aria-label="Shuffle" className={cx(ghostBtn, 'hidden sm:block')}>
             <Shuffle className="size-3" />
           </button>
           <button type="button" aria-label="Previous" onClick={onPrev} disabled={!track} className={cx(ghostBtn, !track && 'cursor-not-allowed opacity-40')}>
@@ -109,12 +114,12 @@ export default function PlayerFooter({
           <button type="button" aria-label="Next" onClick={onNext} disabled={!track} className={cx(ghostBtn, !track && 'cursor-not-allowed opacity-40')}>
             <SkipForward className="size-[11px]" fill="currentColor" />
           </button>
-          <button type="button" aria-label="Repeat" className={ghostBtn}>
+          <button type="button" aria-label="Repeat" className={cx(ghostBtn, 'hidden sm:block')}>
             <Repeat className="size-[14px]" />
           </button>
         </div>
 
-        <div className="flex w-full items-center gap-3">
+        <div className="hidden w-full items-center gap-3 sm:flex">
           <span className="w-8 text-right text-[12px] leading-4 text-muted">{toClock(progress)}</span>
           <div
             role="slider"
@@ -133,7 +138,7 @@ export default function PlayerFooter({
       </div>
 
       {/* Right controls */}
-      <div className="flex w-[308px] min-w-[200px] items-center justify-end gap-[14px]">
+      <div className="hidden w-[308px] min-w-[200px] items-center justify-end gap-[14px] lg:flex">
         <button type="button" aria-label="Lyrics" className={ghostBtn}>
           <Mic2 className="size-4" />
         </button>
