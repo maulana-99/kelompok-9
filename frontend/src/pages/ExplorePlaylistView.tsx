@@ -22,7 +22,7 @@ export default function ExplorePlaylistView() {
   }, [tracks, rememberTracks]);
 
   return (
-    <div className="mx-auto flex max-w-[1280px] flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-[1280px] flex-col gap-6 p-4 sm:p-8">
       {loading && (
         <p role="status" className="text-center text-[12px] text-muted">
           Memuat lagu...
@@ -36,7 +36,7 @@ export default function ExplorePlaylistView() {
 
       {data && (
         <>
-          <header className="flex items-end gap-6">
+          <header className="flex flex-col gap-6 sm:flex-row sm:items-end">
             <TrackThumb
               track={tracks[0] ? { ...tracks[0], thumbnail: data.thumbnail || tracks[0].thumbnail } : null}
               className="size-40 border-line/60 bg-line"

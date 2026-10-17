@@ -1,9 +1,11 @@
-import { Clock, Music, Heart } from 'lucide-react';
+import { Clock, Heart } from 'lucide-react';
 import { cx } from '../lib/utils';
 import Equalizer from './Equalizer';
+import TrackThumb from './TrackThumb';
 import type { Track } from '../types';
 
-const COLS = 'grid grid-cols-[62px_minmax(0,1fr)_220px_141px_62px] items-center gap-4';
+const COLS =
+  'grid grid-cols-[28px_minmax(0,1fr)_72px] items-center gap-3 md:grid-cols-[48px_minmax(0,1fr)_minmax(0,220px)_80px] md:gap-4 lg:grid-cols-[62px_minmax(0,1fr)_220px_141px_80px]';
 
 interface TrackListProps {
   tracks: Track[];
@@ -24,12 +26,12 @@ export default function TrackList({
   onToggleLike,
 }: TrackListProps) {
   return (
-    <div className="px-8">
+    <div className="px-2 sm:px-8">
       <div className={cx(COLS, 'px-4 py-[10px] text-[11px] font-semibold uppercase leading-4 tracking-[0.55px] text-muted')}>
         <span className="text-center">#</span>
         <span>Title</span>
-        <span>Album</span>
-        <span>Date added</span>
+        <span className="hidden md:block">Album</span>
+        <span className="hidden lg:block">Date added</span>
         <span className="flex justify-end">
           <Clock className="size-[13px]" />
         </span>
@@ -51,7 +53,7 @@ export default function TrackList({
               onKeyDown={(e) => streamable && (e.key === 'Enter' || e.key === ' ') && onPlay(t.id)}
               className={cx(
                 COLS,
-                'h-14 border-b border-line/20 px-4 transition-colors',
+                'h-14 border-b border-line/20 px-2 transition-colors sm:px-4',
                 !streamable
                   ? 'cursor-not-allowed opacity-50'
                   : 'cursor-pointer',
@@ -63,9 +65,7 @@ export default function TrackList({
               </div>
 
               <div className="flex min-w-0 items-center gap-[14px]">
-                <div className="flex size-10 shrink-0 items-center justify-center border border-line/60 bg-line">
-                  <Music className="size-[13px] text-muted" />
-                </div>
+                <TrackThumb track={t} className="size-10 border-line/60 bg-line" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-[6px]">
                     <p className={cx('truncate text-[14px] font-medium leading-5', active ? 'text-primary-soft' : 'text-ink')}>
@@ -79,8 +79,8 @@ export default function TrackList({
                 </div>
               </div>
 
-              <p className="truncate text-[14px] leading-5 text-dim">{t.album}</p>
-              <p className="truncate text-[12px] leading-4 text-muted">{t.added}</p>
+              <p className="hidden truncate text-[14px] leading-5 text-dim md:block">{t.album}</p>
+              <p className="hidden truncate text-[12px] leading-4 text-muted lg:block">{t.added}</p>
 
               <div className="flex items-center justify-end gap-3">
                 <button

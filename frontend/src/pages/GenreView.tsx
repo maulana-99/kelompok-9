@@ -1,46 +1,20 @@
-import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ListMusic } from 'lucide-react';
-import SectionHeading from '../components/SectionHeading';
-import { getGenre, thumbUrl } from '../lib/music';
+import MusicPlaylistCard from '../components/MusicPlaylistCard';
+import PageHeader from '../components/PageHeader';
+import { getGenre, getGenres } from '../lib/music';
 import { useAsync } from '../lib/useAsync';
-import type { MusicPlaylist } from '../types';
-
-function MusicPlaylistCard({ playlist, onOpen }: { playlist: MusicPlaylist; onOpen: (id: string) => void }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(playlist.id)}
-      className="flex min-w-0 flex-col border border-line/40 bg-card p-3 text-left transition-colors hover:bg-hover"
-    >
-      {playlist.thumbnail && !failed ? (
-        <img
-          src={thumbUrl(playlist.thumbnail)}
-          alt=""
-          loading="lazy"
-          onError={() => setFailed(true)}
-          className="mb-3 aspect-square w-full object-cover"
-        />
-      ) : (
-        <div className="mb-3 flex aspect-square w-full items-center justify-center bg-line">
-          <ListMusic className="size-8 text-muted" strokeWidth={1.5} />
-        </div>
-      )}
-      <p className="w-full truncate text-[14px] font-semibold leading-5 text-ink">{playlist.title}</p>
-      {playlist.subtitle && <p className="line-clamp-2 pt-[2px] text-[12px] leading-4 text-muted">{playlist.subtitle}</p>}
-    </button>
-  );
-}
 
 /** Genre View — playlist-playlist dalam satu kategori (GET /music/genres/:genreId). */
 export default function GenreView() {
   const navigate = useNavigate();
   const { genreId = '' } = useParams();
   const { data, error, loading } = useAsync(`genre:${genreId}`, () => getGenre(genreId));
+  // Category list is cached by the backend; only used for the accent color and group label.
+  const { data: genres } = useAsync('genres', getGenres);
+  const genre = genres?.find((g) => g.id === genreId);
 
   return (
-    <div className="mx-auto flex max-w-[1280px] flex-col gap-6 p-8">
+    <div className="mx-auto flex max-w-[1280px] flex-col gap-8 p-4 sm:p-8">
       {loading && (
         <p role="status" className="text-center text-[12px] text-muted">
           Memuat playlist...
@@ -53,9 +27,15 @@ export default function GenreView() {
       )}
 
       {data && (
-        <section>
-          <SectionHeading title={data.name || 'Playlist'} />
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
+        <>
+          <PageHeader
+            eyebrow={`Jelajahi / ${genre?.group === 'mood' ? 'Mood' : 'Genre'}`}
+            eyebrowTo="/search"
+            accent={genre?.color}
+            title={data.name || genre?.name || 'Playlist'}
+            subtitle={`${data.playlists.length} playlist`}
+          />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 lg:grid-cols-5">
             {data.playlists.map((p) => (
               <MusicPlaylistCard
                 key={p.id}
@@ -64,7 +44,7 @@ export default function GenreView() {
               />
             ))}
           </div>
-        </section>
+        </>
       )}
     </div>
   );

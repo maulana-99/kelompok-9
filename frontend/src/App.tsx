@@ -9,7 +9,6 @@ import LibraryView from './pages/LibraryView';
 import LoginView from './pages/LoginView';
 import PlaylistView from './pages/PlaylistView';
 import SearchView from './pages/SearchView';
-import ExploreView from './pages/ExploreView';
 import GenreView from './pages/GenreView';
 import ExplorePlaylistView from './pages/ExplorePlaylistView';
 import LikedSongs from './pages/likedSongs';
@@ -64,16 +63,7 @@ function App() {
               }
             />
 
-            <Route
-              path="/explore"
-              element={
-                <RequireAuth>
-                  <AppShell>
-                    <ExploreView />
-                  </AppShell>
-                </RequireAuth>
-              }
-            />
+            <Route path="/explore" element={<Navigate to="/search" replace />} />
 
             <Route
               path="/explore/playlist/:playlistId"

@@ -46,6 +46,7 @@ export interface MusicGenre {
   id: string;
   name: string;
   group: 'mood' | 'genre';
+  color?: string;
 }
 
 /** Playlist YouTube Music (bukan playlist milik user). */
@@ -123,10 +124,10 @@ export interface AppUser {
   created_at?: string;
 }
 
-export type AppView = 'login' | 'home' | 'search' | 'explore' | 'playlist' | 'library' | 'liked-songs';
+export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library' | 'liked-songs';
 
 /** Halaman yang bisa dibuka dari menu sidebar. */
-export type NavTarget = 'home' | 'search' | 'explore' | 'library' | 'liked-songs';
+export type NavTarget = 'home' | 'search' | 'library' | 'liked-songs';
 
 export interface NavigationEntry {
   view: AppView;

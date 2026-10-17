@@ -122,15 +122,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const view: AppView = pathname.startsWith('/playlist/')
     ? 'playlist'
-    : pathname === '/search'
+    : pathname === '/search' || pathname.startsWith('/explore')
       ? 'search'
-      : pathname.startsWith('/explore')
-        ? 'explore'
-        : pathname === '/library'
-          ? 'library'
-          : pathname === '/liked-songs'
-            ? 'liked-songs'
-            : 'home';
+      : pathname === '/library'
+        ? 'library'
+        : pathname === '/liked-songs'
+          ? 'liked-songs'
+          : 'home';
   const activePlaylistId = pathname.startsWith('/playlist/') ? pathname.replace('/playlist/', '') : null;
 
   // ---- Audio: muat ulang saat lagu berganti ----
@@ -176,8 +174,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       navigate('/');
     } else if (target === 'search') {
       navigate('/search');
-    } else if (target === 'explore') {
-      navigate('/explore');
     } else if (target === 'library') {
       navigate('/library');
     } else {
