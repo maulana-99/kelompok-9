@@ -92,96 +92,6 @@ func NewMusicService() MusicService {
 	}
 }
 
-type ytSearchResponse struct {
-	Contents *ytSearchContents `json:"contents"`
-}
-
-type ytSearchContents struct {
-	TabbedSearchResultsRenderer *struct {
-		Tabs []ytSearchTab `json:"tabs"`
-	} `json:"tabbedSearchResultsRenderer"`
-}
-
-type ytSearchTab struct {
-	TabRenderer *struct {
-		Content *struct {
-			SectionListRenderer *struct {
-				Contents []ytSearchSection `json:"contents"`
-			} `json:"sectionListRenderer"`
-		} `json:"content"`
-	} `json:"tabRenderer"`
-}
-
-type ytSearchSection struct {
-	MusicShelfRenderer *ytMusicShelf `json:"musicShelfRenderer"`
-	ItemSection        *struct {
-		Contents []struct {
-			MusicResponsiveListItemRenderer *ytMusicListItem `json:"musicResponsiveListItemRenderer"`
-		} `json:"contents"`
-	} `json:"itemSectionRenderer"`
-}
-
-type ytMusicShelf struct {
-	Title *struct {
-		Runs []struct {
-			Text string `json:"text"`
-		} `json:"runs"`
-	} `json:"title"`
-	Contents []struct {
-		MusicResponsiveListItemRenderer *ytMusicListItem `json:"musicResponsiveListItemRenderer"`
-	} `json:"contents"`
-}
-
-type ytMusicListItem struct {
-	FlexColumns []struct {
-		MusicResponsiveListItemFlexColumnRenderer *struct {
-			Text *struct {
-				Runs []struct {
-					Text string `json:"text"`
-				} `json:"runs"`
-			} `json:"text"`
-		} `json:"musicResponsiveListItemFlexColumnRenderer"`
-	} `json:"flexColumns"`
-	FixedColumns []struct {
-		MusicResponsiveListItemFixedColumnRenderer *struct {
-			Text *struct {
-				Runs []struct {
-					Text string `json:"text"`
-				} `json:"runs"`
-			} `json:"text"`
-		} `json:"musicResponsiveListItemFixedColumnRenderer"`
-	} `json:"fixedColumns"`
-	Thumbnail *struct {
-		MusicThumbnailRenderer *struct {
-			Thumbnail *struct {
-				Thumbnails []struct {
-					URL string `json:"url"`
-				} `json:"thumbnails"`
-			} `json:"thumbnail"`
-		} `json:"musicThumbnailRenderer"`
-	} `json:"thumbnail"`
-	PlaylistItemData *struct {
-		VideoID string `json:"videoId"`
-	} `json:"playlistItemData"`
-	Overlay *struct {
-		MusicItemThumbnailOverlayRenderer *struct {
-			Content *struct {
-				MusicPlayButtonRenderer *struct {
-					PlayNavigationEndpoint *struct {
-						WatchEndpoint *struct {
-							WatchEndpointMusicSupportedConfigs *struct {
-								WatchEndpointMusicConfig *struct {
-									MusicVideoType string `json:"musicVideoType"`
-								} `json:"watchEndpointMusicConfig"`
-							} `json:"watchEndpointMusicSupportedConfigs"`
-						} `json:"watchEndpoint"`
-					} `json:"playNavigationEndpoint"`
-				} `json:"musicPlayButtonRenderer"`
-			} `json:"content"`
-		} `json:"musicItemThumbnailOverlayRenderer"`
-	} `json:"overlay"`
-}
-
 // ytItem pairs a search item with the type ("song"/"video") derived from the
 // shelf it was found in; empty for flat sections where the type label sits in
 // the metadata column instead.
@@ -272,6 +182,13 @@ func (s *musicService) fetchSearch(ctx context.Context, query, params string) (*
 		return nil, err
 	}
 	return &parsed, nil
+}
+
+// upstreamStatusError is returned by callInnertube on a non-200 response.
+type upstreamStatusError struct{ code int }
+
+func (e *upstreamStatusError) Error() string {
+	return fmt.Sprintf("youtube music gagal: status %d", e.code)
 }
 
 // callInnertube POSTs body (plus the WEB_REMIX client context) to an innertube

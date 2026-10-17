@@ -30,8 +30,6 @@ const (
 	genresCacheTTL   = 24 * time.Hour
 	categoryCacheTTL = 6 * time.Hour
 	playlistCacheTTL = 30 * time.Minute
-	// Keys come from user input (genre/playlist id), so bound the cache size.
-	browseCacheMax = 500
 )
 
 var (
@@ -40,48 +38,6 @@ var (
 	// browseId of a playlist, e.g. "VLRDCLAK5uy_mb2_YIBK-LCLtVkq8fFY_bIvEdxjt4n6g".
 	playlistIDPattern = regexp.MustCompile(`^VL[A-Za-z0-9_-]{10,80}$`)
 )
-
-// upstreamStatusError is returned by callInnertube on a non-200 response.
-type upstreamStatusError struct{ code int }
-
-func (e *upstreamStatusError) Error() string {
-	return fmt.Sprintf("youtube music gagal: status %d", e.code)
-}
-
-type browseEntry struct {
-	data   any
-	expiry time.Time
-}
-
-// cachedBrowse returns the cached value for key, or calls fetch and caches its result.
-func cachedBrowse[T any](s *musicService, key string, ttl time.Duration, fetch func() (T, error)) (T, error) {
-	now := time.Now()
-	s.browseMu.Lock()
-	if entry, ok := s.browseCache[key]; ok && now.Before(entry.expiry) {
-		s.browseMu.Unlock()
-		return entry.data.(T), nil
-	}
-	s.browseMu.Unlock()
-
-	data, err := fetch()
-	if err != nil {
-		return data, err
-	}
-
-	s.browseMu.Lock()
-	defer s.browseMu.Unlock()
-	if len(s.browseCache) >= browseCacheMax {
-		for k, entry := range s.browseCache {
-			if now.After(entry.expiry) {
-				delete(s.browseCache, k)
-			}
-		}
-	}
-	if len(s.browseCache) < browseCacheMax {
-		s.browseCache[key] = browseEntry{data: data, expiry: now.Add(ttl)}
-	}
-	return data, nil
-}
 
 // browse calls the innertube browse endpoint. YouTube answers 400/404 for an
 // unknown browseId/params, which is mapped to ErrBrowseNotFound.
@@ -94,85 +50,7 @@ func (s *musicService) browse(ctx context.Context, body map[string]any, out any)
 	return err
 }
 
-type ytRuns struct {
-	Runs []struct {
-		Text string `json:"text"`
-	} `json:"runs"`
-}
-
-func (r *ytRuns) text() string {
-	if r == nil {
-		return ""
-	}
-	var sb strings.Builder
-	for _, run := range r.Runs {
-		sb.WriteString(run.Text)
-	}
-	return sb.String()
-}
-
-type ytThumbnailRenderer struct {
-	MusicThumbnailRenderer *struct {
-		Thumbnail *struct {
-			Thumbnails []struct {
-				URL string `json:"url"`
-			} `json:"thumbnails"`
-		} `json:"thumbnail"`
-	} `json:"musicThumbnailRenderer"`
-}
-
-// largest returns the last valid thumbnail URL (the largest one).
-func (t *ytThumbnailRenderer) largest() string {
-	if t == nil || t.MusicThumbnailRenderer == nil || t.MusicThumbnailRenderer.Thumbnail == nil {
-		return ""
-	}
-	url := ""
-	for _, th := range t.MusicThumbnailRenderer.Thumbnail.Thumbnails {
-		if strings.HasPrefix(th.URL, "http") {
-			url = th.URL
-		}
-	}
-	return url
-}
-
-type ytBrowseEndpoint struct {
-	BrowseID string `json:"browseId"`
-	Params   string `json:"params"`
-}
-
 // ---- Genres ----
-
-type ytGenresResponse struct {
-	Contents *struct {
-		SingleColumnBrowseResultsRenderer *struct {
-			Tabs []struct {
-				TabRenderer *struct {
-					Content *struct {
-						SectionListRenderer *struct {
-							Contents []struct {
-								GridRenderer *struct {
-									Header *struct {
-										GridHeaderRenderer *struct {
-											Title *ytRuns `json:"title"`
-										} `json:"gridHeaderRenderer"`
-									} `json:"header"`
-									Items []struct {
-										MusicNavigationButtonRenderer *struct {
-											ButtonText   *ytRuns `json:"buttonText"`
-											ClickCommand *struct {
-												BrowseEndpoint *ytBrowseEndpoint `json:"browseEndpoint"`
-											} `json:"clickCommand"`
-										} `json:"musicNavigationButtonRenderer"`
-									} `json:"items"`
-								} `json:"gridRenderer"`
-							} `json:"contents"`
-						} `json:"sectionListRenderer"`
-					} `json:"content"`
-				} `json:"tabRenderer"`
-			} `json:"tabs"`
-		} `json:"singleColumnBrowseResultsRenderer"`
-	} `json:"contents"`
-}
 
 func (s *musicService) Genres(ctx context.Context) ([]model.MusicGenre, error) {
 	return cachedBrowse(s, "genres", genresCacheTTL, func() ([]model.MusicGenre, error) {
@@ -218,7 +96,11 @@ func parseGenres(parsed *ytGenresResponse) []model.MusicGenre {
 				if endpoint.BrowseID != ytmCategoryBrowseID || endpoint.Params == "" || name == "" {
 					continue
 				}
-				genres = append(genres, model.MusicGenre{ID: endpoint.Params, Name: name, Group: group})
+				genre := model.MusicGenre{ID: endpoint.Params, Name: name, Group: group}
+				if button.Solid != nil && button.Solid.LeftStripeColor != 0 {
+					genre.Color = fmt.Sprintf("#%06x", button.Solid.LeftStripeColor&0xFFFFFF)
+				}
+				genres = append(genres, genre)
 			}
 		}
 	}
@@ -226,47 +108,6 @@ func parseGenres(parsed *ytGenresResponse) []model.MusicGenre {
 }
 
 // ---- Playlists inside one genre ----
-
-type ytTwoRowItem struct {
-	Title              *ytRuns              `json:"title"`
-	Subtitle           *ytRuns              `json:"subtitle"`
-	ThumbnailRenderer  *ytThumbnailRenderer `json:"thumbnailRenderer"`
-	NavigationEndpoint *struct {
-		BrowseEndpoint *ytBrowseEndpoint `json:"browseEndpoint"`
-	} `json:"navigationEndpoint"`
-}
-
-type ytTwoRowItems []struct {
-	MusicTwoRowItemRenderer *ytTwoRowItem `json:"musicTwoRowItemRenderer"`
-}
-
-type ytCategoryResponse struct {
-	Header *struct {
-		MusicHeaderRenderer *struct {
-			Title *ytRuns `json:"title"`
-		} `json:"musicHeaderRenderer"`
-	} `json:"header"`
-	Contents *struct {
-		SingleColumnBrowseResultsRenderer *struct {
-			Tabs []struct {
-				TabRenderer *struct {
-					Content *struct {
-						SectionListRenderer *struct {
-							Contents []struct {
-								MusicCarouselShelfRenderer *struct {
-									Contents ytTwoRowItems `json:"contents"`
-								} `json:"musicCarouselShelfRenderer"`
-								GridRenderer *struct {
-									Items ytTwoRowItems `json:"items"`
-								} `json:"gridRenderer"`
-							} `json:"contents"`
-						} `json:"sectionListRenderer"`
-					} `json:"content"`
-				} `json:"tabRenderer"`
-			} `json:"tabs"`
-		} `json:"singleColumnBrowseResultsRenderer"`
-	} `json:"contents"`
-}
 
 func (s *musicService) GenrePlaylists(ctx context.Context, genreID string) (*model.MusicGenreDetail, error) {
 	if !genreIDPattern.MatchString(genreID) {
@@ -333,38 +174,6 @@ func parseCategory(parsed *ytCategoryResponse) *model.MusicGenreDetail {
 }
 
 // ---- Tracks inside one playlist ----
-
-type ytPlaylistResponse struct {
-	Contents *struct {
-		TwoColumnBrowseResultsRenderer *struct {
-			Tabs []struct {
-				TabRenderer *struct {
-					Content *struct {
-						SectionListRenderer *struct {
-							Contents []struct {
-								MusicResponsiveHeaderRenderer *struct {
-									Title     *ytRuns              `json:"title"`
-									Thumbnail *ytThumbnailRenderer `json:"thumbnail"`
-								} `json:"musicResponsiveHeaderRenderer"`
-							} `json:"contents"`
-						} `json:"sectionListRenderer"`
-					} `json:"content"`
-				} `json:"tabRenderer"`
-			} `json:"tabs"`
-			SecondaryContents *struct {
-				SectionListRenderer *struct {
-					Contents []struct {
-						MusicPlaylistShelfRenderer *struct {
-							Contents []struct {
-								MusicResponsiveListItemRenderer *ytMusicListItem `json:"musicResponsiveListItemRenderer"`
-							} `json:"contents"`
-						} `json:"musicPlaylistShelfRenderer"`
-					} `json:"contents"`
-				} `json:"sectionListRenderer"`
-			} `json:"secondaryContents"`
-		} `json:"twoColumnBrowseResultsRenderer"`
-	} `json:"contents"`
-}
 
 func (s *musicService) Playlist(ctx context.Context, playlistID string) (*model.MusicPlaylistDetail, error) {
 	if !playlistIDPattern.MatchString(playlistID) {
