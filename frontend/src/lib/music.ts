@@ -1,5 +1,5 @@
 import { API_URL, api } from './api';
-import type { MusicSearchResult } from '../types';
+import type { MusicGenre, MusicGenreDetail, MusicPlaylistDetail, MusicSearchResult } from '../types';
 
 // GET /music/search — public, no auth needed
 export async function searchMusic(query: string, limit = 20): Promise<MusicSearchResult[]> {
@@ -35,4 +35,19 @@ export async function fetchMusicInfos(ids: string[]): Promise<MusicSearchResult[
     ),
   );
   return batches.flat();
+}
+
+// GET /music/genres — kategori jelajah (mood & genre) dari YouTube Music
+export async function getGenres(): Promise<MusicGenre[]> {
+  return api<MusicGenre[]>('/music/genres');
+}
+
+// GET /music/genres/:genreId — playlist-playlist dalam satu kategori
+export async function getGenre(genreId: string): Promise<MusicGenreDetail> {
+  return api<MusicGenreDetail>(`/music/genres/${encodeURIComponent(genreId)}`);
+}
+
+// GET /music/playlists/:playlistId — lagu-lagu dalam playlist YouTube Music
+export async function getMusicPlaylist(playlistId: string): Promise<MusicPlaylistDetail> {
+  return api<MusicPlaylistDetail>(`/music/playlists/${encodeURIComponent(playlistId)}`);
 }

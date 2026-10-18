@@ -70,6 +70,12 @@ type MusicService interface {
 	OpenStream(ctx context.Context, videoID, rangeHeader string) (*http.Response, error)
 	// OpenThumbnail retrieves thumbnail images.
 	OpenThumbnail(ctx context.Context, rawURL string) (*http.Response, error)
+	// Genres lists the YouTube Music browse categories (moods and genres).
+	Genres(ctx context.Context) ([]model.MusicGenre, error)
+	// GenrePlaylists lists the YouTube Music playlists inside one category.
+	GenrePlaylists(ctx context.Context, genreID string) (*model.MusicGenreDetail, error)
+	// Playlist returns the tracks of one YouTube Music playlist.
+	Playlist(ctx context.Context, playlistID string) (*model.MusicPlaylistDetail, error)
 }
 
 type musicService struct {
@@ -81,6 +87,10 @@ type musicService struct {
 	// Cache the stream URL for each video ID so that yt-dlp isn't called for every range request.
 	mu      sync.Mutex
 	streams map[string]streamEntry
+
+	// Cache browse responses (genres, playlists): same data for every user.
+	browseMu    sync.Mutex
+	browseCache map[string]browseEntry
 	// Cache track metadata so /music/info doesn't hit innertube for every request.
 	infos map[string]infoEntry
 }
@@ -100,12 +110,9 @@ func NewMusicService() MusicService {
 		searchClient: &http.Client{Timeout: 15 * time.Second},
 		streamClient: &http.Client{},
 		streams:      make(map[string]streamEntry),
+		browseCache:  make(map[string]browseEntry),
 		infos:        make(map[string]infoEntry),
 	}
-}
-
-type ytSearchResponse struct {
-	Contents *ytSearchContents `json:"contents"`
 }
 
 // ytPlayerResponse is the innertube player payload; only videoDetails is
@@ -124,75 +131,6 @@ type ytPlayerResponse struct {
 			} `json:"thumbnails"`
 		} `json:"thumbnail"`
 	} `json:"videoDetails"`
-}
-
-type ytSearchContents struct {
-	TabbedSearchResultsRenderer *struct {
-		Tabs []ytSearchTab `json:"tabs"`
-	} `json:"tabbedSearchResultsRenderer"`
-}
-
-type ytSearchTab struct {
-	TabRenderer *struct {
-		Content *struct {
-			SectionListRenderer *struct {
-				Contents []ytSearchSection `json:"contents"`
-			} `json:"sectionListRenderer"`
-		} `json:"content"`
-	} `json:"tabRenderer"`
-}
-
-type ytSearchSection struct {
-	MusicShelfRenderer *ytMusicShelf `json:"musicShelfRenderer"`
-	ItemSection        *struct {
-		Contents []struct {
-			MusicResponsiveListItemRenderer *ytMusicListItem `json:"musicResponsiveListItemRenderer"`
-		} `json:"contents"`
-	} `json:"itemSectionRenderer"`
-}
-
-type ytMusicShelf struct {
-	Title *struct {
-		Runs []struct {
-			Text string `json:"text"`
-		} `json:"runs"`
-	} `json:"title"`
-	Contents []struct {
-		MusicResponsiveListItemRenderer *ytMusicListItem `json:"musicResponsiveListItemRenderer"`
-	} `json:"contents"`
-}
-
-type ytMusicListItem struct {
-	FlexColumns []struct {
-		MusicResponsiveListItemFlexColumnRenderer *struct {
-			Text *struct {
-				Runs []struct {
-					Text string `json:"text"`
-				} `json:"runs"`
-			} `json:"text"`
-		} `json:"musicResponsiveListItemFlexColumnRenderer"`
-	} `json:"flexColumns"`
-	FixedColumns []struct {
-		MusicResponsiveListItemFixedColumnRenderer *struct {
-			Text *struct {
-				Runs []struct {
-					Text string `json:"text"`
-				} `json:"runs"`
-			} `json:"text"`
-		} `json:"musicResponsiveListItemFixedColumnRenderer"`
-	} `json:"fixedColumns"`
-	Thumbnail *struct {
-		MusicThumbnailRenderer *struct {
-			Thumbnail *struct {
-				Thumbnails []struct {
-					URL string `json:"url"`
-				} `json:"thumbnails"`
-			} `json:"thumbnail"`
-		} `json:"musicThumbnailRenderer"`
-	} `json:"thumbnail"`
-	PlaylistItemData *struct {
-		VideoID string `json:"videoId"`
-	} `json:"playlistItemData"`
 }
 
 // ytItem pairs a search item with the type ("song"/"video") derived from the
@@ -276,28 +214,43 @@ func (s *musicService) Search(ctx context.Context, query string, limit int) ([]m
 
 // fetchSearch calls the innertube search API (empty params = no filter).
 func (s *musicService) fetchSearch(ctx context.Context, query, params string) (*ytSearchResponse, error) {
-	body := map[string]any{
-		"context": map[string]any{
-			"client": map[string]any{
-				"clientName":    "WEB_REMIX",
-				"clientVersion": "1.20240401.01.00",
-				"hl":            "id",
-				"gl":            "ID",
-			},
-		},
-		"query": query,
-	}
+	body := map[string]any{"query": query}
 	if params != "" {
 		body["params"] = params
 	}
-	payload, err := json.Marshal(body)
-	if err != nil {
+	var parsed ytSearchResponse
+	if err := s.callInnertube(ctx, ytmSearchURL, body, &parsed); err != nil {
 		return nil, err
 	}
+	return &parsed, nil
+}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ytmSearchURL, strings.NewReader(string(payload)))
+// upstreamStatusError is returned by callInnertube on a non-200 response.
+type upstreamStatusError struct{ code int }
+
+func (e *upstreamStatusError) Error() string {
+	return fmt.Sprintf("youtube music gagal: status %d", e.code)
+}
+
+// callInnertube POSTs body (plus the WEB_REMIX client context) to an innertube
+// endpoint and decodes the JSON response into out.
+func (s *musicService) callInnertube(ctx context.Context, endpoint string, body map[string]any, out any) error {
+	body["context"] = map[string]any{
+		"client": map[string]any{
+			"clientName":    "WEB_REMIX",
+			"clientVersion": "1.20240401.01.00",
+			"hl":            "id",
+			"gl":            "ID",
+		},
+	}
+	payload, err := json.Marshal(body)
 	if err != nil {
-		return nil, err
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
@@ -306,19 +259,14 @@ func (s *musicService) fetchSearch(ctx context.Context, query, params string) (*
 
 	res, err := s.searchClient.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("youtube music search gagal: status %d", res.StatusCode)
+		return &upstreamStatusError{code: res.StatusCode}
 	}
-
-	var parsed ytSearchResponse
-	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
-		return nil, err
-	}
-	return &parsed, nil
+	return json.NewDecoder(res.Body).Decode(out)
 }
 
 // GetInfo resolves track metadata for one video ID via the innertube

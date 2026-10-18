@@ -1,4 +1,5 @@
-import { Music } from 'lucide-react';
+import { History, Music } from 'lucide-react';
+import EmptyState from './EmptyState';
 import { cx } from '../lib/utils';
 import Equalizer from './Equalizer';
 import type { Track } from '../types';
@@ -8,6 +9,7 @@ interface RecentTrackListProps {
   currentTrackId: string | null;
   isPlaying: boolean;
   onPlay: (id: string) => void;
+  onSearch?: () => void;
 }
 
 /** Daftar "Recently Played" pada Home (baris aktif punya badge "Playing"). */
@@ -16,15 +18,16 @@ export default function RecentTrackList({
   currentTrackId,
   isPlaying,
   onPlay,
+  onSearch,
 }: RecentTrackListProps) {
   if (items.length === 0) {
     return (
-      <div className="border border-line/40 bg-card px-8 py-10 text-center">
-        <p className="text-[14px] leading-5 text-muted">
-          Belum ada lagu yang diputar. Cari lagu di halaman Search lalu tekan play — lagu yang kamu
-          putar akan muncul di sini.
-        </p>
-      </div>
+      <EmptyState
+        icon={History}
+        title="Belum ada lagu yang diputar"
+        text="Lagu yang kamu putar akan muncul di sini."
+        action={onSearch ? { label: 'Cari lagu', onClick: onSearch } : undefined}
+      />
     );
   }
 

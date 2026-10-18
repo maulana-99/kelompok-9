@@ -47,7 +47,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   const payload = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
 
   if (!res.ok || !payload?.success) {
-    throw new ApiError(payload?.message ?? 'Terjadi kesalahan', res.status);
+    throw new ApiError(payload?.message ?? `Terjadi kesalahan (HTTP ${res.status})`, res.status);
   }
 
   return payload.data as T;

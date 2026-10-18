@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Plus, Play, Pause, Heart, Search, LayoutGrid, List, Sparkles } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import { cx, toDurationLabel, toSeconds } from '../lib/utils';
 import { usePlayer } from '../context/PlayerContext';
 import PlaylistCover from '../components/PlaylistCover';
@@ -51,27 +52,13 @@ export default function LibraryView() {
   const showPlaylists = filter === 'all' || filter === 'playlists';
 
   return (
-    <div className="mx-auto flex max-w-[1400px] flex-col gap-8 p-8">
-      {/* Top Banner / Header */}
-      <section className="flex flex-col gap-6 border-b border-line/40 pb-8 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 pb-2">
-            <span className="size-2 bg-primary" />
-            <p className="text-[12px] font-semibold uppercase leading-4 tracking-[1.2px] text-primary-soft">
-              COLLECTION
-            </p>
-          </div>
-          <h1 className="text-[32px] font-bold leading-9 tracking-[-0.8px] text-ink sm:text-[38px]">
-            Your Library
-          </h1>
-          <p className="pt-2 text-[14px] leading-5 text-muted">
-            {playlists.length} {playlists.length === 1 ? 'playlist' : 'playlists'} • {totalTracks} tracks curated
-          </p>
-        </div>
-
-        {/* Action button */}
-        <div className="flex items-center gap-3">
-          <button
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-8 p-4 sm:p-8">
+      <PageHeader
+        eyebrow="Collection"
+        title="Your Library"
+        subtitle={`${playlists.length} ${playlists.length === 1 ? 'playlist' : 'playlists'} • ${totalTracks} tracks curated`}
+      >
+        <button
             type="button"
             onClick={openCreate}
             className="flex items-center gap-2 bg-primary px-5 py-2.5 text-[12px] font-bold uppercase tracking-[0.6px] text-on-primary shadow-primary transition hover:brightness-110 active:scale-95"
@@ -79,13 +66,12 @@ export default function LibraryView() {
             <Plus className="size-4" strokeWidth={3} />
             CREATE PLAYLIST
           </button>
-        </div>
-      </section>
+      </PageHeader>
 
       {/* Filter and View Controls Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Filter chips */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {([
             { id: 'all', label: 'All' },
             { id: 'playlists', label: 'Playlists' },

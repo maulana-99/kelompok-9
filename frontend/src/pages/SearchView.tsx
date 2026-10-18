@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react';
+import { SearchX } from 'lucide-react';
+import EmptyState from '../components/EmptyState';
+import GenreSections from '../components/GenreSections';
+import PageHeader from '../components/PageHeader';
 import SearchSongsTable from '../components/SearchSongsTable';
 import UserCard from '../components/UserCard';
 import { searchMusic } from '../lib/music';
@@ -105,7 +109,7 @@ export default function SearchView() {
   const hasNoResults = searched && songResults.length === 0 && peopleResults.length === 0;
 
   return (
-    <div className="flex flex-col gap-6 px-8 pb-8 pt-6">
+    <div className="mx-auto flex max-w-[1280px] flex-col gap-8 p-4 sm:p-8">
       {trimmed && (
         <div className="flex items-center gap-2" role="tablist" aria-label="Search filter">
           {TABS.map(({ key, label }) => (
@@ -135,15 +139,18 @@ export default function SearchView() {
       )}
 
       {!trimmed && (
-        <p className="py-16 text-center text-[14px] text-muted">
-          Ketik judul lagu, artis, album, atau nama/username teman di kolom pencarian.
-        </p>
+        <>
+          <PageHeader
+            eyebrow="Search"
+            title="Jelajahi Musik"
+            subtitle="Cari lagu, artis, atau album di kolom atas, atau pilih mood dan genre di bawah."
+          />
+          <GenreSections />
+        </>
       )}
 
       {trimmed && searched && !pending && hasNoResults && !musicError && !peopleError && (
-        <p className="py-16 text-center text-[14px] text-muted">
-          Tidak ada hasil untuk &ldquo;{query}&rdquo;. Coba kata kunci lain.
-        </p>
+        <EmptyState icon={SearchX} title={`Tidak ada hasil untuk \u201c${trimmed}\u201d`} text="Coba kata kunci lain." />
       )}
 
       {showMusic && musicError && (

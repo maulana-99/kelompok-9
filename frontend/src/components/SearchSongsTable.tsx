@@ -5,7 +5,9 @@ import TrackThumb from './TrackThumb';
 import AddToPlaylistButton from './AddToPlaylistMenu';
 import type { Track } from '../types';
 
-const COLS = 'grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_80px_64px] items-center';
+const COLS = 'grid grid-cols-[32px_minmax(0,1fr)_56px_64px] items-center sm:grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_80px_64px]';
+// Without the album column (e.g. playlists of music videos with no album data).
+const COLS_NO_ALBUM = 'grid grid-cols-[32px_minmax(0,1fr)_56px_64px] items-center sm:grid-cols-[40px_minmax(0,1fr)_80px_64px]';
 
 interface SearchSongsTableProps {
   tracks: Track[];
@@ -25,13 +27,16 @@ export default function SearchSongsTable({
   onPlay,
   onToggleLike,
 }: SearchSongsTableProps) {
+  const showAlbum = tracks.some((t) => t.album && t.album !== '-');
+  const cols = showAlbum ? COLS : COLS_NO_ALBUM;
+
   return (
     <div className="overflow-hidden border border-line/50 bg-sunken/60">
-      <div className={cx(COLS, 'bg-card/90 px-5 py-3 text-[11px] font-semibold uppercase leading-4 tracking-[0.55px] text-muted')}>
+      <div className={cx(cols, 'bg-card/90 px-3 py-3 sm:px-5 text-[11px] font-semibold uppercase leading-4 tracking-[0.55px] text-muted')}>
         <span className="pl-[11px]">#</span>
         <span>Title</span>
-        <span>Album</span>
-        <span className="text-right pr-[18px]">Duration</span>
+        {showAlbum && <span className="hidden sm:block">Album</span>}
+        <span className="pr-2 text-right sm:pr-[18px]">Duration</span>
         <span />
       </div>
 
@@ -46,8 +51,8 @@ export default function SearchSongsTable({
             onClick={() => onPlay(t.id)}
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPlay(t.id)}
             className={cx(
-              COLS,
-              'h-14 cursor-pointer border-t border-line/40 px-5 transition-colors',
+              cols,
+              'h-14 cursor-pointer border-t border-line/40 px-3 transition-colors sm:px-5',
               active ? 'bg-card' : 'hover:bg-card/60',
             )}
           >
@@ -61,8 +66,8 @@ export default function SearchSongsTable({
                 <p className="truncate text-[12px] leading-4 text-muted">{t.artist}</p>
               </div>
             </div>
-            <p className="truncate pr-4 text-[12px] leading-4 text-muted">{t.album || '-'}</p>
-            <p className="pr-[18px] text-right text-[12px] leading-4 text-muted">{t.duration}</p>
+            {showAlbum && <p className="hidden truncate pr-4 text-[12px] leading-4 text-muted sm:block">{t.album || '-'}</p>}
+            <p className="pr-2 text-right text-[12px] leading-4 text-muted sm:pr-[18px]">{t.duration}</p>
             <div className="flex items-center justify-center gap-2 pr-2">
               <AddToPlaylistButton track={t} className="py-1" />
               <button
