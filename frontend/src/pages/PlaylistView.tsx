@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Play, Pause, Heart, Download, MoreHorizontal, Trash2, ListMusic } from 'lucide-react';
+import { Play, Pause, Trash2, ListMusic, Pencil } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { cx, toDurationLabel, toSeconds } from '../lib/utils';
 import TrackList from '../components/TrackList';
 import PlaylistCover from '../components/PlaylistCover';
+import ModalEditPlaylist from '../components/ModalEditPlaylist';
 import { usePlayer } from '../context/PlayerContext';
 import { useAuth } from '../context/AuthContext';
 import type { Track } from '../types';
@@ -36,6 +37,7 @@ export default function PlaylistView() {
     loadPlaylist,
     removeFromPlaylist,
     deletePlaylist,
+    updatePlaylist,
     currentTrackId,
     isPlaying,
     likedIds,
@@ -47,6 +49,7 @@ export default function PlaylistView() {
   const [failedId, setFailedId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const playlist = playlists.find((p) => p.id === playlistId) ?? visitedPlaylists[playlistId];
   const loadFailed = !playlist && failedId === playlistId;
@@ -144,30 +147,27 @@ export default function PlaylistView() {
                 {playlistIsPlaying ? <Pause className="size-[13px]" fill="currentColor" /> : <Play className="size-[13px]" fill="currentColor" />}
                 {playlistIsPlaying ? 'Pause' : 'Play'}
               </button>
-              {[
-                { icon: Heart, label: 'Like playlist' },
-                { icon: Download, label: 'Download' },
-                { icon: MoreHorizontal, label: 'More options' },
-              ].map(({ icon: Icon, label }) => (
-                <button
-                  key={label}
-                  type="button"
-                  aria-label={label}
-                  className="flex size-10 items-center justify-center text-muted transition-colors hover:text-primary"
-                >
-                  <Icon className="size-4" />
-                </button>
-              ))}
+              {/* Like & Download: disembunyikan sementara, mungkin menyusul. */}
               {isOwner && (
-                <button
-                  type="button"
-                  aria-label="Delete playlist"
-                  onClick={() => void handleDelete()}
-                  disabled={deleting}
-                  className="flex size-10 items-center justify-center text-muted transition-colors hover:text-red-400 disabled:opacity-50"
-                >
-                  <Trash2 className="size-4" />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    aria-label="Edit playlist"
+                    onClick={() => setShowEdit(true)}
+                    className="flex size-10 items-center justify-center text-muted transition-colors hover:text-primary"
+                  >
+                    <Pencil className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Delete playlist"
+                    onClick={() => void handleDelete()}
+                    disabled={deleting}
+                    className="flex size-10 items-center justify-center text-muted transition-colors hover:text-red-400 disabled:opacity-50"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -201,6 +201,18 @@ export default function PlaylistView() {
           />
         )}
       </section>
+
+      {showEdit && (
+        <ModalEditPlaylist
+          initialName={playlist.name}
+          initialDescription={playlist.description}
+          onClose={() => setShowEdit(false)}
+          onSave={async (input) => {
+            await updatePlaylist(playlist.id, input);
+            setShowEdit(false);
+          }}
+        />
+      )}
     </div>
   );
 }

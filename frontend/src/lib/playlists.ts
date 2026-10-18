@@ -4,6 +4,7 @@ import type {
   BackendPlaylistSong,
   CreatePlaylistInput,
   Playlist,
+  UpdatePlaylistInput,
 } from '../types';
 
 // POST /playlists (auth) — backend menyimpan title (bukan name).
@@ -21,6 +22,19 @@ export async function createPlaylist(
 // GET /playlists?user_id= (optional auth)
 export async function fetchPlaylists(userId: number, token: string | null): Promise<BackendPlaylist[]> {
   return api<BackendPlaylist[]>(`/playlists?user_id=${encodeURIComponent(String(userId))}`, { token });
+}
+
+// PUT /playlists/:id (auth, owner-only) — ubah judul/deskripsi.
+export async function updatePlaylistApi(
+  id: string,
+  input: UpdatePlaylistInput,
+  token: string | null,
+): Promise<BackendPlaylist> {
+  return api<BackendPlaylist>(`/playlists/${id}`, {
+    method: 'PUT',
+    body: input,
+    token,
+  });
 }
 
 // GET /playlists/:id (optional auth) — backend membalas objek playlist datar

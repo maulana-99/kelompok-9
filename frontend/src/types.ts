@@ -102,6 +102,11 @@ export interface CreatePlaylistInput {
   status: 'public' | 'private';
 }
 
+export interface UpdatePlaylistInput {
+  title?: string;
+  description?: string;
+}
+
 export interface BackendPlaylist {
   id: number;
   title: string;

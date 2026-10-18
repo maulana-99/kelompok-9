@@ -10,10 +10,11 @@ import {
   fetchPlaylists,
   removePlaylistSong,
   toPlaylist,
+  updatePlaylistApi,
 } from '../lib/playlists';
 import { toSeconds, toTrack } from '../lib/utils';
 import ModalCreatePlaylist from '../components/ModalCreatePlaylist';
-import type { AppView, CreatePlaylistInput, NavTarget, Playlist, Track } from '../types';
+import type { AppView, CreatePlaylistInput, NavTarget, Playlist, Track, UpdatePlaylistInput } from '../types';
 
 /** Seluruh state + aksi yang dipakai halaman dan kerangka aplikasi. */
 export interface PlayerStore {
@@ -51,6 +52,8 @@ export interface PlayerStore {
   addToPlaylist: (playlistId: string, track: Track) => Promise<void>;
   removeFromPlaylist: (playlistId: string, trackId: string) => Promise<void>;
   deletePlaylist: (playlistId: string) => Promise<void>;
+  /** Ubah judul/deskripsi playlist (owner-only). */
+  updatePlaylist: (playlistId: string, input: UpdatePlaylistInput) => Promise<void>;
 
   // Pencarian
   query: string;
@@ -442,6 +445,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     navigate(`/playlist/${playlist.id}`);
   };
 
+  // ---- Playlist: update (nama / deskripsi, owner-only) ----
+  const updatePlaylist = async (playlistId: string, input: UpdatePlaylistInput) => {
+    if (!token) throw new Error('Sesi berakhir, login ulang untuk mengedit playlist.');
+    const updated = await updatePlaylistApi(playlistId, input, token);
+    const patch = { name: updated.title, description: updated.description, status: updated.status };
+    setPlaylists((list) => list.map((p) => (p.id === playlistId ? { ...p, ...patch } : p)));
+    setVisitedPlaylists((map) =>
+      map[playlistId] ? { ...map, [playlistId]: { ...map[playlistId], ...patch } } : map,
+    );
+  };
+
   // ---- Playlist: load single (untuk akses langsung ke URL) ----
   const loadPlaylist = useCallback(
     async (id: string) => {
@@ -547,6 +561,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     addToPlaylist,
     removeFromPlaylist,
     deletePlaylist,
+    updatePlaylist,
 
     query,
     setQuery,
