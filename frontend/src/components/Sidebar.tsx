@@ -1,5 +1,7 @@
 import { Home, Search, Library, Heart, Plus, Settings, LogOut, User } from 'lucide-react';
 import { cx } from '../lib/utils';
+import { usePlayer } from '../context/PlayerContext';
+import PlaylistCover from './PlaylistCover';
 import type { AppUser, AppView, Playlist } from '../types';
 
 interface SidebarProps {
@@ -30,6 +32,8 @@ export default function Sidebar({
   onCreatePlaylist,
   onLogout,
 }: SidebarProps) {
+  const { tracksOf } = usePlayer();
+
   const navItems = [
     { key: 'home', label: 'Home', icon: Home, target: 'home' },
     { key: 'search', label: 'Search', icon: Search, target: 'search' },
@@ -102,6 +106,7 @@ export default function Sidebar({
                     active ? 'font-medium text-primary' : 'text-dim hover:text-ink',
                   )}
                 >
+                  <PlaylistCover tracks={tracksOf(p.trackIds).slice(0, 4)} className="size-7 shrink-0 border border-line/40" iconClassName="size-2.5 text-muted" />
                   {active && <span className="size-[6px] shrink-0 bg-primary" />}
                   <span className="truncate">{p.name}</span>
                 </button>

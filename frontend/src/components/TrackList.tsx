@@ -1,17 +1,23 @@
-import { Clock, Music, Heart } from 'lucide-react';
+import { Clock, Heart, Trash2 } from 'lucide-react';
 import { cx } from '../lib/utils';
 import Equalizer from './Equalizer';
+import TrackThumb from './TrackThumb';
 import type { Track } from '../types';
 
-const COLS = 'grid grid-cols-[62px_minmax(0,1fr)_220px_141px_62px] items-center gap-4';
+const COLS = 'grid grid-cols-[62px_minmax(0,1fr)_220px_141px_96px] items-center gap-4';
 
 interface TrackListProps {
   tracks: Track[];
   currentTrackId: string | null;
   isPlaying: boolean;
   likedIds: string[];
+  /** music id -> "18 Oct 2025" (kapan lagu ditambahkan). */
+  addedLabels?: Record<string, string>;
   onPlay: (id: string) => void;
   onToggleLike: (id: string) => void;
+  /** Hanya untuk pemilik playlist — tampilkan tombol hapus per baris. */
+  onRemove?: (track: Track) => void;
+  removingId?: string | null;
 }
 
 /** Tabel tracklist di Playlist Preview. */
@@ -20,8 +26,11 @@ export default function TrackList({
   currentTrackId,
   isPlaying,
   likedIds,
+  addedLabels,
   onPlay,
   onToggleLike,
+  onRemove,
+  removingId,
 }: TrackListProps) {
   return (
     <div className="px-8">
@@ -40,6 +49,7 @@ export default function TrackList({
           const active = t.id === currentTrackId;
           const liked = likedIds.includes(t.id);
           const streamable = Boolean(t.videoId);
+          const removing = removingId === t.id;
           return (
             <div
               key={t.id}
@@ -51,11 +61,12 @@ export default function TrackList({
               onKeyDown={(e) => streamable && (e.key === 'Enter' || e.key === ' ') && onPlay(t.id)}
               className={cx(
                 COLS,
-                'h-14 border-b border-line/20 px-4 transition-colors',
+                'group/row h-14 border-b border-line/20 px-4 transition-colors',
                 !streamable
                   ? 'cursor-not-allowed opacity-50'
                   : 'cursor-pointer',
-                active ? 'bg-card' : streamable && 'hover:bg-card/60',
+                removing && 'opacity-40',
+                active ? 'bg-card' : streamable && !removing && 'hover:bg-card/60',
               )}
             >
               <div className="flex items-center justify-center text-[14px] leading-5 text-muted">
@@ -63,9 +74,7 @@ export default function TrackList({
               </div>
 
               <div className="flex min-w-0 items-center gap-[14px]">
-                <div className="flex size-10 shrink-0 items-center justify-center border border-line/60 bg-line">
-                  <Music className="size-[13px] text-muted" />
-                </div>
+                <TrackThumb track={t} className="size-10 shrink-0 border-line/60 bg-line" iconClassName="size-[13px] text-muted" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-[6px]">
                     <p className={cx('truncate text-[14px] font-medium leading-5', active ? 'text-primary-soft' : 'text-ink')}>
@@ -80,9 +89,23 @@ export default function TrackList({
               </div>
 
               <p className="truncate text-[14px] leading-5 text-dim">{t.album}</p>
-              <p className="truncate text-[12px] leading-4 text-muted">{t.added}</p>
+              <p className="truncate text-[12px] leading-4 text-muted">{addedLabels?.[t.id] ?? t.added}</p>
 
               <div className="flex items-center justify-end gap-3">
+                {onRemove && (
+                  <button
+                    type="button"
+                    aria-label="Remove from playlist"
+                    title="Remove from playlist"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(t);
+                    }}
+                    className="text-muted opacity-0 transition-opacity hover:text-red-400 focus-visible:opacity-100 group-hover/row:opacity-100"
+                  >
+                    <Trash2 className="size-[14px]" />
+                  </button>
+                )}
                 <button
                   type="button"
                   aria-label={liked ? 'Unlike' : 'Like'}
@@ -95,7 +118,7 @@ export default function TrackList({
                 >
                   <Heart className="size-[14px]" fill={liked ? 'currentColor' : 'none'} />
                 </button>
-                <span className="text-[12px] leading-4 text-muted">{t.duration}</span>
+                <span className="w-10 text-right text-[12px] leading-4 text-muted">{t.duration}</span>
               </div>
             </div>
           );

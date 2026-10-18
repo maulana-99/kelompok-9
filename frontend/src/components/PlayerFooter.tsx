@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cx, toClock } from '../lib/utils';
 import TrackThumb from './TrackThumb';
+import AddToPlaylistButton from './AddToPlaylistMenu';
 import type { Track } from '../types';
 
 interface PlayerFooterProps {
@@ -72,6 +73,7 @@ export default function PlayerFooter({
           </div>
           <p className="truncate text-[12px] leading-4 text-muted">{track ? track.artist : 'Pilih lagu dari hasil pencarian'}</p>
         </div>
+        <AddToPlaylistButton track={track} iconSize="size-[15px]" className="py-1" />
         <button
           type="button"
           aria-label="Like"

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -78,6 +79,59 @@ func (h *MusicHandler) Thumb(c *gin.Context) {
 	c.Writer.WriteHeader(http.StatusOK)
 
 	_, _ = io.Copy(c.Writer, upstream.Body)
+}
+
+// GET /api/v1/music/info?ids=a,b,c (or repeated ids= params)
+// Track metadata resolver for playlist rows: youtube music (innertube)
+// is scraped server-side so no device-local cache is needed to know
+// what a stored videoId actually is.
+func (h *MusicHandler) Infos(c *gin.Context) {
+	raw := c.QueryArray("ids")
+	ids := make([]string, 0, len(raw))
+	seen := make(map[string]bool)
+	for _, chunk := range raw {
+		for _, id := range strings.Split(chunk, ",") {
+			id = strings.TrimSpace(id)
+			if id == "" || seen[id] {
+				continue
+			}
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+
+	if len(ids) == 0 {
+		response.Error(c, http.StatusBadRequest, "parameter ids wajib diisi", nil)
+		return
+	}
+	if len(ids) > 100 {
+		response.Error(c, http.StatusBadRequest, "maksimal 100 id per permintaan", nil)
+		return
+	}
+	if invalid := firstInvalidID(ids); invalid != "" {
+		response.Error(c, http.StatusBadRequest, "musicId tidak valid: "+invalid, nil)
+		return
+	}
+
+	results, err := h.service.GetInfos(c.Request.Context(), ids)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "gagal mengambil info lagu", err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, "berhasil mengambil info lagu", results)
+}
+
+// musicIDPattern mirrors service.musicIDPattern without importing internals.
+var musicIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
+
+func firstInvalidID(ids []string) string {
+	for _, id := range ids {
+		if !musicIDPattern.MatchString(id) {
+			return id
+		}
+	}
+	return ""
 }
 
 // GET /api/v1/music/:musicId/stream

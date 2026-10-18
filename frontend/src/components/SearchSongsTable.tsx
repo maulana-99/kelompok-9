@@ -2,9 +2,10 @@ import { Heart } from 'lucide-react';
 import { cx } from '../lib/utils';
 import Equalizer from './Equalizer';
 import TrackThumb from './TrackThumb';
+import AddToPlaylistButton from './AddToPlaylistMenu';
 import type { Track } from '../types';
 
-const COLS = 'grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_80px_40px] items-center';
+const COLS = 'grid grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_80px_64px] items-center';
 
 interface SearchSongsTableProps {
   tracks: Track[];
@@ -62,7 +63,8 @@ export default function SearchSongsTable({
             </div>
             <p className="truncate pr-4 text-[12px] leading-4 text-muted">{t.album || '-'}</p>
             <p className="pr-[18px] text-right text-[12px] leading-4 text-muted">{t.duration}</p>
-            <div className="flex justify-center">
+            <div className="flex items-center justify-center gap-2 pr-2">
+              <AddToPlaylistButton track={t} className="py-1" />
               <button
                 type="button"
                 aria-label={liked ? 'Unlike' : 'Like'}

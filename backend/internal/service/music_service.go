@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +34,8 @@ var (
 const (
 	// Internal endpoint YouTube Music (innertube) for search.
 	ytmSearchURL = "https://music.youtube.com/youtubei/v1/search?prettyPrint=false"
+	// Internal endpoint YouTube Music (innertube) for track metadata by video ID.
+	ytmPlayerURL = "https://music.youtube.com/youtubei/v1/player?prettyPrint=false"
 	// Filter the search results to include only the songs shelf..
 
 	ytmSongsFilter = "EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D"
@@ -46,11 +49,23 @@ const (
 	streamCacheTTL = 4 * time.Hour
 	// Time limit for calling yt-dlp.
 	resolveTimeout = 30 * time.Second
+	// Music metadata barely changes; cache the parsed info for a day.
+	infoCacheTTL = 24 * time.Hour
+	// Time limit for one innertube player call.
+	infoTimeout = 15 * time.Second
+	// Max parallel innertube calls inside GetInfos.
+	infoWorkers = 5
 )
 
 type MusicService interface {
 	// Search for songs on YouTube Music based on input query.
 	Search(ctx context.Context, query string, limit int) ([]model.MusicResult, error)
+	// GetInfo returns track metadata (title, artist, thumbnail, duration) for one video ID.
+	GetInfo(ctx context.Context, videoID string) (model.MusicResult, error)
+	// GetInfos returns track metadata for many video IDs, preserving input order.
+	// Entries whose metadata could not be resolved come back as stubs
+	// (video_id only, empty title) instead of failing the whole batch.
+	GetInfos(ctx context.Context, videoIDs []string) ([]model.MusicResult, error)
 	// OpenStream opens an audio connection for a video ID and returns an upstream response
 	OpenStream(ctx context.Context, videoID, rangeHeader string) (*http.Response, error)
 	// OpenThumbnail retrieves thumbnail images.
@@ -66,10 +81,17 @@ type musicService struct {
 	// Cache the stream URL for each video ID so that yt-dlp isn't called for every range request.
 	mu      sync.Mutex
 	streams map[string]streamEntry
+	// Cache track metadata so /music/info doesn't hit innertube for every request.
+	infos map[string]infoEntry
 }
 
 type streamEntry struct {
 	url    string
+	expiry time.Time
+}
+
+type infoEntry struct {
+	result model.MusicResult
 	expiry time.Time
 }
 
@@ -78,11 +100,30 @@ func NewMusicService() MusicService {
 		searchClient: &http.Client{Timeout: 15 * time.Second},
 		streamClient: &http.Client{},
 		streams:      make(map[string]streamEntry),
+		infos:        make(map[string]infoEntry),
 	}
 }
 
 type ytSearchResponse struct {
 	Contents *ytSearchContents `json:"contents"`
+}
+
+// ytPlayerResponse is the innertube player payload; only videoDetails is
+// needed — title, author, length and largest thumbnail.
+type ytPlayerResponse struct {
+	VideoDetails *struct {
+		VideoID       string `json:"videoId"`
+		Title         string `json:"title"`
+		Author        string `json:"author"`
+		LengthSeconds string `json:"lengthSeconds"`
+		Thumbnail     *struct {
+			Thumbnails []struct {
+				URL    string `json:"url"`
+				Width  int    `json:"width"`
+				Height int    `json:"height"`
+			} `json:"thumbnails"`
+		} `json:"thumbnail"`
+	} `json:"videoDetails"`
 }
 
 type ytSearchContents struct {
@@ -278,6 +319,165 @@ func (s *musicService) fetchSearch(ctx context.Context, query, params string) (*
 		return nil, err
 	}
 	return &parsed, nil
+}
+
+// GetInfo resolves track metadata for one video ID via the innertube
+// player endpoint (same approach as the thumbnail proxy: YouTube is the
+// source of truth, the backend just parses the payload for the client).
+func (s *musicService) GetInfo(ctx context.Context, videoID string) (model.MusicResult, error) {
+	if !musicIDPattern.MatchString(videoID) {
+		return model.MusicResult{}, ErrInvalidMusicID
+	}
+
+	s.mu.Lock()
+	if entry, ok := s.infos[videoID]; ok && time.Now().Before(entry.expiry) {
+		s.mu.Unlock()
+		return entry.result, nil
+	}
+	s.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(ctx, infoTimeout)
+	defer cancel()
+
+	body := map[string]any{
+		"context": map[string]any{
+			"client": map[string]any{
+				"clientName":    "WEB_REMIX",
+				"clientVersion": "1.20240401.01.00",
+				"hl":            "id",
+				"gl":            "ID",
+			},
+		},
+		"videoId": videoID,
+		"racyCheckOk": true,
+		"contentCheckOk": true,
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return model.MusicResult{}, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ytmPlayerURL, strings.NewReader(string(payload)))
+	if err != nil {
+		return model.MusicResult{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+	req.Header.Set("Origin", "https://music.youtube.com")
+	req.Header.Set("Referer", "https://music.youtube.com/")
+
+	res, err := s.searchClient.Do(req)
+	if err != nil {
+		return model.MusicResult{}, fmt.Errorf("youtube music info gagal: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return model.MusicResult{}, fmt.Errorf("youtube music info gagal: status %d", res.StatusCode)
+	}
+
+	var parsed ytPlayerResponse
+	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return model.MusicResult{}, err
+	}
+
+	if parsed.VideoDetails == nil || parsed.VideoDetails.VideoID == "" || parsed.VideoDetails.Title == "" {
+		return model.MusicResult{}, ErrStreamUnavailable
+	}
+
+	result := model.MusicResult{
+		VideoID:   videoID,
+		Title:     parsed.VideoDetails.Title,
+		Artist:    parsed.VideoDetails.Author,
+		Thumbnail: largestThumbnail(parsed.VideoDetails.Thumbnail),
+		Duration:  formatLengthSeconds(parsed.VideoDetails.LengthSeconds),
+		Type:      "song",
+	}
+
+	s.mu.Lock()
+	s.infos[videoID] = infoEntry{result: result, expiry: time.Now().Add(infoCacheTTL)}
+	s.mu.Unlock()
+
+	return result, nil
+}
+
+// GetInfos resolves metadata for many video IDs in parallel with a small
+// worker pool. Unresolvable IDs return as stubs so playlist rows stay
+// visible (and still playable — streaming only needs the video ID).
+func (s *musicService) GetInfos(ctx context.Context, videoIDs []string) ([]model.MusicResult, error) {
+	seen := make(map[string]bool, len(videoIDs))
+	unique := make([]string, 0, len(videoIDs))
+	for _, id := range videoIDs {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] || !musicIDPattern.MatchString(id) {
+			continue
+		}
+		seen[id] = true
+		unique = append(unique, id)
+	}
+
+	results := make([]model.MusicResult, len(unique))
+	sem := make(chan struct{}, infoWorkers)
+	var wg sync.WaitGroup
+	for i, id := range unique {
+		wg.Add(1)
+		go func(idx int, videoID string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			sem <- struct{}{}
+			result, err := s.GetInfo(ctx, videoID)
+			if err != nil {
+				// Stub keeps the row renderable; empty title tells the
+				// client the metadata is unknown.
+				results[idx] = model.MusicResult{VideoID: videoID, Type: "song"}
+				return
+			}
+			results[idx] = result
+		}(i, id)
+	}
+	wg.Wait()
+	return results, nil
+}
+
+// largestThumbnail picks the last valid (http) thumbnail URL — innertube
+// orders them ascending by size.
+func largestThumbnail(thumbs *struct {
+	Thumbnails []struct {
+		URL    string `json:"url"`
+		Width  int    `json:"width"`
+		Height int    `json:"height"`
+	} `json:"thumbnails"`
+}) string {
+	if thumbs == nil {
+		return ""
+	}
+	url := ""
+	for _, t := range thumbs.Thumbnails {
+		if strings.HasPrefix(t.URL, "http") {
+			url = t.URL
+		}
+	}
+	return url
+}
+
+// formatLengthSeconds converts YouTube's "225" into "3:45" (or "57:21" style).
+func formatLengthSeconds(raw string) string {
+	total, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || total < 0 {
+		return ""
+	}
+	return toClockLabel(total)
+}
+
+// toClockLabel renders seconds as "m:ss" / "h:mm:ss".
+func toClockLabel(total int) string {
+	hours := total / 3600
+	minutes := (total % 3600) / 60
+	seconds := total % 60
+	if hours > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", hours, minutes, seconds)
+	}
+	return fmt.Sprintf("%d:%02d", minutes, seconds)
 }
 
 // collectItems gathers all items with a potential videoId from the two
