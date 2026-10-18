@@ -31,6 +31,7 @@ export default function PlaylistView() {
   const { user } = useAuth();
   const {
     playlists,
+    visitedPlaylists,
     tracksOf,
     loadPlaylist,
     removeFromPlaylist,
@@ -47,7 +48,7 @@ export default function PlaylistView() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const playlist = playlists.find((p) => p.id === playlistId);
+  const playlist = playlists.find((p) => p.id === playlistId) ?? visitedPlaylists[playlistId];
   const loadFailed = !playlist && failedId === playlistId;
 
   // Bila playlist belum ada di state (akses URL langsung / device lain),

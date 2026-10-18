@@ -33,6 +33,8 @@ export interface PlayerStore {
 
   // Data
   playlists: Playlist[];
+  /** Playlist publik milik orang lain yang sedang dibuka (bukan daftar sendiri). */
+  visitedPlaylists: Record<string, Playlist>;
   tracks: Track[];
   likedIds: string[];
   recentTracks: Track[];
@@ -40,6 +42,8 @@ export interface PlayerStore {
 
   /** Hydrate track metadata (cache -> /music/info) untuk music_id tersimpan. */
   tracksOf: (ids: string[]) => Track[];
+  /** Hydrate metadata lagu dari luar (mis. kartu playlist profil orang lain). */
+  hydrateTrackMetadata: (ids: string[]) => Promise<void>;
   /** Ambil detail playlist dari backend bila belum ada di state (throw bila 404). */
   loadPlaylist: (id: string) => Promise<void>;
 
@@ -120,6 +124,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const [query, setQueryState] = useState('');
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [visitedPlaylists, setVisitedPlaylists] = useState<Record<string, Playlist>>({});
   const [knownTracks, setKnownTracks] = useState<Track[]>(() => readTracksCache());
   const [showCreate, setShowCreate] = useState(false);
 
@@ -293,19 +298,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       try {
         const list = await fetchPlaylists(userId, token);
         const details = await Promise.all(
-          list.map((backend) => fetchPlaylistDetail(String(backend.id), token).catch(() => null)),
+          list.map((backend) =>
+            fetchPlaylistDetail(String(backend.id), token).catch((err) => {
+              console.error(`gagal ambil detail playlist ${backend.id}:`, err);
+              return null;
+            }),
+          ),
         );
         if (cancelled) return;
         const mapped: Playlist[] = [];
         for (const detail of details) {
           if (!detail) continue;
-          mapped.push(toPlaylist(detail.playlist, detail.songs));
+          mapped.push(toPlaylist(detail, detail.songs));
         }
         setPlaylists(mapped);
         void hydrateTracks(mapped.flatMap((p) => p.trackIds));
-      } catch {
+      } catch (err) {
         // Backend tidak tersedia / sesi mati: daftar dibiarkan kosong,
         // user tetap bisa memakai player.
+        console.error('gagal memuat daftar playlist:', err);
       }
     })();
 
@@ -436,11 +447,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       if (!token) throw new Error('Playlist tidak ditemukan.');
       const detail = await fetchPlaylistDetail(id, token);
-      const playlist = toPlaylist(detail.playlist, detail.songs);
-      setPlaylists((list) => (list.some((p) => p.id === id) ? list : [playlist, ...list]));
+      const playlist = toPlaylist(detail, detail.songs);
+      if (playlist.userId === user?.id) {
+        setPlaylists((list) => (list.some((p) => p.id === id) ? list : [playlist, ...list]));
+      } else {
+        // Playlist publik milik orang lain — jangan bocor ke sidebar/profil sendiri.
+        setVisitedPlaylists((map) => ({ ...map, [id]: playlist }));
+      }
       void hydrateTracks(playlist.trackIds);
     },
-    [token, hydrateTracks],
+    [token, hydrateTracks, user?.id],
   );
 
   // ---- Playlist: add song ----
@@ -519,12 +535,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     logout: doLogout,
 
     playlists,
+    visitedPlaylists,
     tracks: knownTracks,
     likedIds,
     recentTracks,
     likedTracks,
 
     tracksOf,
+    hydrateTrackMetadata: hydrateTracks,
     loadPlaylist,
     addToPlaylist,
     removeFromPlaylist,

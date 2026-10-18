@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { User as UserIcon, Pencil } from 'lucide-react';
 import UserCard from '../components/UserCard';
 import PlaylistCard from '../components/PlaylistCard';
 import { useAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
+import { fetchPlaylists, fetchPlaylistDetail, toPlaylist } from '../lib/playlists';
 import { followUser, getFollowers, getFollowing, getUser, unfollowUser, updateUser } from '../lib/users';
 import { cx, initialsOf } from '../lib/utils';
-import type { BackendUser } from '../types';
+import type { BackendUser, Playlist } from '../types';
 
 type ListTab = 'followers' | 'following';
 
@@ -15,7 +16,7 @@ type ListTab = 'followers' | 'following';
 export default function ProfileView() {
   const { userId } = useParams<{ userId: string }>();
   const { user: me, token, refresh } = useAuth();
-  const { playlists, openPlaylist } = usePlayer();
+  const { playlists, hydrateTrackMetadata, openPlaylist } = usePlayer();
 
   const profileId = Number(userId);
   const validId = Number.isInteger(profileId) && profileId > 0;
@@ -70,6 +71,41 @@ export default function ProfileView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // ---- Playlist publik milik profil yang sedang dilihat (GET /playlists?user_id=) ----
+  // Di-tag owner-nya agar hasil profil sebelumnya tidak kedapatan saat ganti halaman.
+  const [publicPlaylists, setPublicPlaylists] = useState<{ owner: number; list: Playlist[] } | null>(null);
+
+  useEffect(() => {
+    if (!validId || isOwn) return undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        // Tanpa / dengan token: backend hanya membalas playlist publik milik user tsb.
+        const list = await fetchPlaylists(profileId, token);
+        const details = await Promise.all(
+          list.map((b) =>
+            fetchPlaylistDetail(String(b.id), token).catch((err) => {
+              console.error(`gagal ambil detail playlist ${b.id}:`, err);
+              return null;
+            }),
+          ),
+        );
+        if (cancelled) return;
+        const mapped = details
+          .filter((d): d is NonNullable<typeof d> => d != null)
+          .map((d) => toPlaylist(d, d.songs));
+        setPublicPlaylists({ owner: profileId, list: mapped });
+        void hydrateTrackMetadata(mapped.flatMap((p) => p.trackIds));
+      } catch (err) {
+        console.error('gagal memuat playlist profil:', err);
+        if (!cancelled) setPublicPlaylists({ owner: profileId, list: [] });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [validId, isOwn, profileId, token, hydrateTrackMetadata]);
 
   const toggleEdit = () => {
     // Prefill edit form when opening it (event handler, not an effect).
@@ -155,9 +191,11 @@ export default function ProfileView() {
   }
 
   const list = listTab === 'followers' ? followers : following;
-  // Playlists are still local-only (no backend endpoint yet): only the owner's
-  // browser has them, so show them on your own page and explain on others'.
-  const ownPlaylists = isOwn ? playlists : [];
+  // Milik sendiri: dari state PlayerContext (sudah termasuk privat).
+  // Orang lain: hasil fetch playlist publik di atas (di-tag owner agar tidak basi).
+  const ownPlaylists = isOwn
+    ? playlists
+    : (publicPlaylists?.owner === profileId ? publicPlaylists.list : []);
 
   return (
     <div>
@@ -333,25 +371,16 @@ export default function ProfileView() {
             {isOwn ? 'Your playlists' : 'Playlists'}
           </h3>
         </div>
-        {isOwn ? (
-          ownPlaylists.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {ownPlaylists.map((p) => (
-                <PlaylistCard key={p.id} playlist={p} onOpen={openPlaylist} />
-              ))}
-            </div>
-          ) : (
-            <p className="py-4 text-[14px] text-muted">Belum ada playlist. Buat dari sidebar.</p>
-          )
+        {ownPlaylists.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {ownPlaylists.map((p) => (
+              <PlaylistCard key={p.id} playlist={p} onOpen={openPlaylist} />
+            ))}
+          </div>
+        ) : isOwn ? (
+          <p className="py-4 text-[14px] text-muted">Belum ada playlist. Buat dari sidebar.</p>
         ) : (
-          <p className="py-4 text-[14px] text-muted">
-            Playlist publik membutuhkan endpoint backend — untuk sekarang hanya playlist lokal pemilik akun yang
-            tampil di profilnya sendiri.{' '}
-            <Link to="/search" className="font-medium text-primary-soft hover:underline">
-              Cari lagu
-            </Link>{' '}
-            untuk mulai membuat playlist.
-          </p>
+          <p className="py-4 text-[14px] text-muted">Belum ada playlist publik.</p>
         )}
       </section>
     </div>

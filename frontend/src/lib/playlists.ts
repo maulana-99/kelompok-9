@@ -23,12 +23,13 @@ export async function fetchPlaylists(userId: number, token: string | null): Prom
   return api<BackendPlaylist[]>(`/playlists?user_id=${encodeURIComponent(String(userId))}`, { token });
 }
 
-// GET /playlists/:id (optional auth) — playlist + daftar lagu (music_id saja).
+// GET /playlists/:id (optional auth) — backend membalas objek playlist datar
+// dengan daftar lagu menempel di field `songs`.
 export async function fetchPlaylistDetail(
   id: string,
   token: string | null,
-): Promise<{ playlist: BackendPlaylist; songs: BackendPlaylistSong[] }> {
-  return api<{ playlist: BackendPlaylist; songs: BackendPlaylistSong[] }>(`/playlists/${id}`, { token });
+): Promise<BackendPlaylist & { songs: BackendPlaylistSong[] }> {
+  return api<BackendPlaylist & { songs: BackendPlaylistSong[] }>(`/playlists/${id}`, { token });
 }
 
 // POST /playlists/:id/songs (auth) — duplicate → 409 ApiError dari backend.
