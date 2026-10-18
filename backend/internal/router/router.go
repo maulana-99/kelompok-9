@@ -49,6 +49,9 @@ func New(db *gorm.DB) *gin.Engine {
 		{
 			music.GET("/search", musicHandler.Search)
 			music.GET("/thumb", musicHandler.Thumb)
+			music.GET("/genres", musicHandler.Genres)
+			music.GET("/genres/:genreId", musicHandler.GenrePlaylists)
+			music.GET("/playlists/:playlistId", musicHandler.Playlist)
 			music.GET("/:musicId/stream", musicHandler.Stream)
 		}
 

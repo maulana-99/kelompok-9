@@ -1,15 +1,18 @@
-import { Home, Search, Library, Heart, Plus, Settings, LogOut, User } from 'lucide-react';
+import { Home, Search, Library, Heart, Plus, Settings, LogOut, User, X } from 'lucide-react';
 import { cx } from '../lib/utils';
-import type { AppUser, AppView, Playlist } from '../types';
+import type { AppUser, AppView, NavTarget, Playlist } from '../types';
 
 interface SidebarProps {
   navLabel?: string;
+  /** Drawer state below the lg breakpoint (always visible on lg). */
+  open: boolean;
+  onClose: () => void;
   view: AppView;
   playlists: Playlist[];
   activePlaylistId: string | null;
   user: AppUser;
   footerHeight: number;
-  onNavigate: (target: 'home' | 'search' | 'library' | 'liked-songs') => void;
+  onNavigate: (target: NavTarget) => void;
   onOpenPlaylist: (id: string) => void;
   onCreatePlaylist: () => void;
   onLogout: () => void;
@@ -18,6 +21,8 @@ interface SidebarProps {
 /** Sidebar kiri. */
 export default function Sidebar({
   navLabel = 'MENU',
+  open,
+  onClose,
   view,
   playlists,
   activePlaylistId,
@@ -37,7 +42,11 @@ export default function Sidebar({
 
   return (
     <aside
-      className="fixed left-0 top-0 z-30 flex w-64 flex-col border-r border-line/60 bg-sunken"
+      aria-label="Navigasi utama"
+      className={cx(
+        'fixed left-0 top-0 z-40 flex w-64 flex-col border-r border-line/60 bg-sunken transition-transform duration-200 lg:z-30 lg:translate-x-0',
+        open ? 'translate-x-0' : '-translate-x-full',
+      )}
       style={{ bottom: footerHeight }}
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -45,6 +54,14 @@ export default function Sidebar({
         <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line/40 px-6">
           <div className="flex size-8 items-center justify-center bg-primary text-[14px] font-bold text-on-primary">M</div>
           <span className="text-[16px] font-bold leading-6 tracking-[0.4px] text-ink">Melodi</span>
+          <button
+            type="button"
+            aria-label="Tutup menu"
+            onClick={onClose}
+            className="ml-auto flex size-8 items-center justify-center text-muted hover:text-primary lg:hidden"
+          >
+            <X className="size-4" />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -110,7 +127,7 @@ export default function Sidebar({
           <button
             type="button"
             onClick={onCreatePlaylist}
-            className="flex w-[215px] items-center justify-center gap-2 border border-dashed border-line px-px py-[7px] text-[12px] font-medium text-muted transition-colors hover:border-primary hover:text-primary"
+            className="flex w-full items-center justify-center gap-2 border border-dashed border-line px-px py-[7px] text-[12px] font-medium text-muted transition-colors hover:border-primary hover:text-primary"
           >
             <Plus className="size-[9.3px]" strokeWidth={3} />
             Create Playlist

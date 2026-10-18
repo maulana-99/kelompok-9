@@ -4,14 +4,14 @@ import { useAuth } from './AuthContext';
 import { streamUrl } from '../lib/music';
 import { toDurationLabel, toSeconds } from '../lib/utils';
 import ModalCreatePlaylist from '../components/ModalCreatePlaylist';
-import type { AppView, CreatePlaylistInput, Playlist, Track } from '../types';
+import type { AppView, CreatePlaylistInput, NavTarget, Playlist, Track } from '../types';
 
 /** Seluruh state + aksi yang dipakai halaman dan kerangka aplikasi. */
 export interface PlayerStore {
   // Navigasi
   view: AppView;
   activePlaylistId: string | null;
-  navigate: (target: 'home' | 'search' | 'library' | 'liked-songs') => void;
+  navigate: (target: NavTarget) => void;
   openPlaylist: (id: string) => void;
   openLiked: () => void;
   openCreate: () => void;
@@ -122,7 +122,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const view: AppView = pathname.startsWith('/playlist/')
     ? 'playlist'
-    : pathname === '/search'
+    : pathname === '/search' || pathname.startsWith('/explore')
       ? 'search'
       : pathname === '/library'
         ? 'library'
@@ -168,7 +168,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [volume]);
 
   // ---- Navigasi ----
-  const navigateTo = (target: 'home' | 'search' | 'library' | 'liked-songs') => {
+  const navigateTo = (target: NavTarget) => {
     if (target === 'home') {
       setQueryState('');
       navigate('/');

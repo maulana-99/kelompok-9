@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Search, X, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, X, Menu } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cx } from '../lib/utils';
 
@@ -9,6 +9,7 @@ interface HeaderProps {
   onForward: () => void;
   canBack: boolean;
   canForward: boolean;
+  onMenu: () => void;
   rightSlot?: ReactNode;
   autoFocus?: boolean;
 }
@@ -21,12 +22,21 @@ export default function Header({
   onForward,
   canBack,
   canForward,
+  onMenu,
   rightSlot,
   autoFocus = false,
 }: HeaderProps) {
   return (
-    <header className="fixed left-64 right-0 top-0 z-20 flex h-16 items-center gap-4 border-b border-line/40 bg-base/80 px-8 pb-px backdrop-blur-[12px]">
-      <div className="flex items-center gap-[6px]">
+    <header className="fixed left-0 right-0 top-0 z-20 flex h-16 items-center gap-3 border-b border-line/40 bg-base/80 px-4 pb-px backdrop-blur-[12px] sm:gap-4 sm:px-8 lg:left-64">
+      <button
+        type="button"
+        aria-label="Buka menu"
+        onClick={onMenu}
+        className="flex size-9 shrink-0 items-center justify-center bg-card text-dim transition-colors hover:text-primary lg:hidden"
+      >
+        <Menu className="size-4" />
+      </button>
+      <div className="hidden items-center gap-[6px] sm:flex">
         {[
           { icon: ChevronLeft, label: 'Back', onClick: onBack, enabled: canBack },
           { icon: ChevronRight, label: 'Forward', onClick: onForward, enabled: canForward },
@@ -69,17 +79,7 @@ export default function Header({
         )}
       </div>
 
-      <div className="ml-auto flex items-center gap-4">
-        {rightSlot ?? (
-          <button
-            type="button"
-            aria-label="Install app"
-            className="flex size-9 items-center justify-center border border-line/60 bg-line text-dim hover:text-primary"
-          >
-            <Download className="size-[13.3px]" strokeWidth={2} />
-          </button>
-        )}
-      </div>
+      {rightSlot && <div className="ml-auto hidden items-center gap-4 sm:flex">{rightSlot}</div>}
     </header>
   );
 }

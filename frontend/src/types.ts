@@ -38,6 +38,35 @@ export interface MusicSearchResult {
   album?: string;
   thumbnail: string;
   duration: string;
+  type?: 'song' | 'video';
+}
+
+/** Kategori jelajah YouTube Music — GET /music/genres. */
+export interface MusicGenre {
+  id: string;
+  name: string;
+  group: 'mood' | 'genre';
+  color?: string;
+}
+
+/** Playlist YouTube Music (bukan playlist milik user). */
+export interface MusicPlaylist {
+  id: string;
+  title: string;
+  subtitle?: string;
+  thumbnail: string;
+}
+
+export interface MusicGenreDetail {
+  name: string;
+  playlists: MusicPlaylist[];
+}
+
+export interface MusicPlaylistDetail {
+  id: string;
+  title: string;
+  thumbnail: string;
+  tracks: MusicSearchResult[];
 }
 
 export interface Track {
@@ -97,6 +126,9 @@ export interface AppUser {
 
 export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library' | 'liked-songs';
 
+/** Halaman yang bisa dibuka dari menu sidebar. */
+export type NavTarget = 'home' | 'search' | 'library' | 'liked-songs';
+
 export interface NavigationEntry {
   view: AppView;
   playlistId?: string;
@@ -109,7 +141,7 @@ export interface AppContext {
   setQuery: (value: string) => void;
   playlists: Playlist[];
   activePlaylistId: string | null;
-  navigate: (target: 'home' | 'search' | 'library' | 'liked-songs') => void;
+  navigate: (target: NavTarget) => void;
   openPlaylist: (id: string) => void;
   openCreate: () => void;
   logout: () => void;
