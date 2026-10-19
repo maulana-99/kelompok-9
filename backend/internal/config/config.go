@@ -26,9 +26,9 @@ type DBConfig struct {
 }
 
 func Load() *Config {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	// .env opsional: di production (Render) env diisi dari dashboard.
+	if err := godotenv.Load(); err != nil {
+		log.Println(".env tidak ditemukan, pakai environment variable sistem")
 	}
 
 	cfg := &Config{
