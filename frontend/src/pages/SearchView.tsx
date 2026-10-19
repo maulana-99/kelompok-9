@@ -40,7 +40,7 @@ interface SearchStore {
 
 /** Search View — Spotify-style tabs: All / Music / People. */
 export default function SearchView() {
-  const { query, currentTrackId, isPlaying, likedIds, playTrack, toggleLike, rememberTracks } = usePlayer();
+  const { query, currentTrackId, isPlaying, likedIds, playMix, toggleLike, rememberTracks } = usePlayer();
   const { token } = useAuth();
   const [tab, setTab] = useState<SearchTab>('all');
 
@@ -186,7 +186,7 @@ export default function SearchView() {
             currentTrackId={currentTrackId}
             isPlaying={isPlaying}
             likedIds={likedIds}
-            onPlay={(id) => playTrack(id, songResults)}
+            onPlay={playMix}
             onToggleLike={toggleLike}
           />
         </section>
