@@ -86,6 +86,8 @@ type musicService struct {
 	searchClient *http.Client
 	// streamClient for audio proxy without a timeout song duration can exceed 15 seconds, canceled when the client disconnects.
 	streamClient *http.Client
+	// proxy is passed to yt-dlp; empty means direct connection.
+	proxy string
 
 	// Cache the stream URL for each video ID so that yt-dlp isn't called for every range request.
 	mu      sync.Mutex
@@ -109,9 +111,25 @@ type infoEntry struct {
 }
 
 func NewMusicService() MusicService {
+	// YOUTUBE_PROXY (e.g. socks5h://127.0.0.1:1080) routes all YouTube traffic
+	// through one proxy, for hosts whose IP YouTube blocks (Render). yt-dlp and
+	// the audio proxy must share it: stream URLs are bound to the resolving IP.
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	proxy := os.Getenv("YOUTUBE_PROXY")
+	if proxy != "" {
+		proxyURL, err := url.Parse(proxy)
+		if err != nil || proxyURL.Host == "" {
+			log.Printf("YOUTUBE_PROXY tidak valid, koneksi langsung dipakai: %q", proxy)
+			proxy = ""
+		} else {
+			transport.Proxy = http.ProxyURL(proxyURL)
+			log.Printf("YouTube lewat proxy %s://%s", proxyURL.Scheme, proxyURL.Host)
+		}
+	}
 	return &musicService{
-		searchClient: &http.Client{Timeout: 15 * time.Second},
-		streamClient: &http.Client{},
+		searchClient: &http.Client{Timeout: 15 * time.Second, Transport: transport},
+		streamClient: &http.Client{Transport: transport},
+		proxy:        proxy,
 		streams:      make(map[string]streamEntry),
 		browseCache:  make(map[string]browseEntry),
 		infos:        make(map[string]infoEntry),
@@ -666,6 +684,9 @@ func (s *musicService) resolveStream(ctx context.Context, videoID string) (strin
 		// yt-dlp only enables deno by default, so node must be
 		// enabled explicitly.
 		"--js-runtimes", "node",
+	}
+	if s.proxy != "" {
+		args = append(args, "--proxy", s.proxy)
 	}
 	args = append(args, cookieArgs()...)
 	// YTDLP_DEBUG puts yt-dlp's verbose output in the error response, for
