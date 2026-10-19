@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -664,8 +666,9 @@ func (s *musicService) resolveStream(ctx context.Context, videoID string) (strin
 		// yt-dlp only enables deno by default, so node must be
 		// enabled explicitly.
 		"--js-runtimes", "node",
-		"https://www.youtube.com/watch?v=" + videoID,
 	}
+	args = append(args, cookieArgs()...)
+	args = append(args, "https://www.youtube.com/watch?v="+videoID)
 	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -749,6 +752,44 @@ func (s *musicService) OpenThumbnail(ctx context.Context, rawURL string) (*http.
 
 // firstMeaningfulLine skips stderr lines that are just noise
 // (e.g. Python deprecation warnings from yt-dlp).
+var (
+	cookieOnce sync.Once
+	cookiePath string
+)
+
+// cookieArgs returns "--cookies <file>" when YTDLP_COOKIES points to a
+// Netscape cookies file. Needed on cloud hosts whose IP YouTube flags as a
+// bot. The file is copied to a temp path first because yt-dlp writes the
+// cookie jar back on exit and secret mounts (e.g. /etc/secrets) are read-only.
+func cookieArgs() []string {
+	cookieOnce.Do(func() {
+		src := os.Getenv("YTDLP_COOKIES")
+		if src == "" {
+			return
+		}
+		data, err := os.ReadFile(src)
+		if err != nil {
+			log.Printf("YTDLP_COOKIES tidak bisa dibaca: %v", err)
+			return
+		}
+		f, err := os.CreateTemp("", "ytdlp-cookies-*.txt")
+		if err != nil {
+			log.Printf("gagal membuat file cookies sementara: %v", err)
+			return
+		}
+		defer f.Close()
+		if _, err := f.Write(data); err != nil {
+			log.Printf("gagal menyalin cookies: %v", err)
+			return
+		}
+		cookiePath = f.Name()
+	})
+	if cookiePath == "" {
+		return nil
+	}
+	return []string{"--cookies", cookiePath}
+}
+
 func firstMeaningfulLine(s string) string {
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
