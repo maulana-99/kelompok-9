@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -205,6 +206,35 @@ func respondBrowseError(c *gin.Context, err error, subject, fallback string) {
 	case errors.Is(err, service.ErrBrowseNotFound):
 		response.Error(c, http.StatusNotFound, subject+" tidak ditemukan", nil)
 	default:
-		response.Error(c, http.StatusBadGateway, fallback, err.Error())
+		log.Printf("%s: %v", fallback, err)
+		response.Error(c, http.StatusBadGateway, fallback, nil)
 	}
+}
+
+// GET /api/v1/music/:musicId/radio — YouTube Music radio for one song (seed first)
+func (h *MusicHandler) Radio(c *gin.Context) {
+	tracks, err := h.service.Radio(c.Request.Context(), c.Param("musicId"))
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidMusicID) {
+			response.Error(c, http.StatusBadRequest, "musicId tidak valid", nil)
+			return
+		}
+		respondBrowseError(c, err, "radio", "gagal mengambil radio")
+		return
+	}
+	response.Success(c, http.StatusOK, "berhasil mengambil radio", tracks)
+}
+
+// GET /api/v1/music/:musicId/lyrics — plain-text lyrics from YouTube Music (404 when none)
+func (h *MusicHandler) Lyrics(c *gin.Context) {
+	lyrics, err := h.service.Lyrics(c.Request.Context(), c.Param("musicId"))
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidMusicID) {
+			response.Error(c, http.StatusBadRequest, "musicId tidak valid", nil)
+			return
+		}
+		respondBrowseError(c, err, "lirik", "gagal mengambil lirik")
+		return
+	}
+	response.Success(c, http.StatusOK, "berhasil mengambil lirik", lyrics)
 }

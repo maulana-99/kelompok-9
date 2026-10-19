@@ -1,4 +1,4 @@
-import type { MusicSearchResult, Track } from '../types';
+import type { MusicSearchResult, RepeatMode, Track } from '../types';
 
 export const cx = (...parts: Array<string | false | null | undefined>): string => parts.filter(Boolean).join(' ');
 
@@ -48,4 +48,21 @@ export const initialsOf = (artist = ''): string => {
   if (words.length === 0) return '??';
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   return (words[0][0] + words[1][0]).toUpperCase();
+};
+
+/** Salinan array dengan urutan acak (Fisher-Yates). */
+export const shuffled = <T,>(items: T[]): T[] => {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+};
+
+/** Label tombol ulangi (aria-label + tooltip). */
+export const REPEAT_LABEL: Record<RepeatMode, string> = {
+  off: 'Ulangi: mati',
+  all: 'Ulangi: semua',
+  one: 'Ulangi: satu lagu',
 };
