@@ -28,6 +28,6 @@ COPY --from=pot /pot/server /opt/bgutil
 COPY --from=pot /pot/plugin.zip /etc/yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip
 COPY --from=build /out/api /usr/local/bin/api
 COPY docker-entrypoint.sh /usr/local/bin/
-ENV APP_ENV=production GIN_MODE=release
+ENV APP_ENV=development GIN_MODE=debug
 USER node
 CMD ["sh", "/usr/local/bin/docker-entrypoint.sh"]
