@@ -660,7 +660,6 @@ func (s *musicService) resolveStream(ctx context.Context, videoID string) (strin
 
 	args := []string{
 		"-f", "bestaudio[ext=m4a]/bestaudio", // m4a is the most compatible across browsers
-		"--no-warnings",
 		"--no-playlist",
 		"--get-url",
 		// Node is used to solve YouTube's JS challenge (BotGuard);
@@ -679,10 +678,12 @@ func (s *musicService) resolveStream(ctx context.Context, videoID string) (strin
 		if errors.Is(err, exec.ErrNotFound) {
 			return "", errors.New("yt-dlp tidak terpasang di server (pip install yt-dlp)")
 		}
+		msg := strings.TrimSpace(stderr.String())
+		// Full output (warnings included) shows why each player client failed.
+		log.Printf("yt-dlp gagal untuk %s: %v\n%s", videoID, err, msg)
 		if ctx.Err() != nil {
 			return "", fmt.Errorf("%w: resolusi stream timeout", ErrStreamUnavailable)
 		}
-		msg := strings.TrimSpace(stderr.String())
 		if msg == "" {
 			msg = err.Error()
 		}
