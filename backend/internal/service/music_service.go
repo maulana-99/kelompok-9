@@ -49,8 +49,9 @@ const (
 
 	// The yt-dlp output stream URL is valid for about 6 hours, cache it for 4 hours..
 	streamCacheTTL = 4 * time.Hour
-	// Time limit for calling yt-dlp.
-	resolveTimeout = 30 * time.Second
+	// Time limit for calling yt-dlp. Free cloud instances (Render) are slow
+	// to solve the JS challenge, so 30s is not enough there.
+	resolveTimeout = 90 * time.Second
 	// Music metadata barely changes; cache the parsed info for a day.
 	infoCacheTTL = 24 * time.Hour
 	// Time limit for one innertube player call.
