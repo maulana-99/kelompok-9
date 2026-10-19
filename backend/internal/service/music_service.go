@@ -668,6 +668,12 @@ func (s *musicService) resolveStream(ctx context.Context, videoID string) (strin
 		"--js-runtimes", "node",
 	}
 	args = append(args, cookieArgs()...)
+	// YTDLP_DEBUG puts yt-dlp's verbose output in the error response, for
+	// hosts without shell access (Render free). Leave unset in normal use.
+	debug := os.Getenv("YTDLP_DEBUG") != ""
+	if debug {
+		args = append(args, "-v")
+	}
 	args = append(args, "https://www.youtube.com/watch?v="+videoID)
 	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
 	var stdout, stderr bytes.Buffer
@@ -686,6 +692,9 @@ func (s *musicService) resolveStream(ctx context.Context, videoID string) (strin
 		}
 		if msg == "" {
 			msg = err.Error()
+		}
+		if debug {
+			return "", fmt.Errorf("%w: %s", ErrStreamUnavailable, msg)
 		}
 		return "", fmt.Errorf("%w: %s", ErrStreamUnavailable, firstMeaningfulLine(msg))
 	}
