@@ -56,6 +56,7 @@ export default function AppShell({ navLabel, children, headerRight, autoFocusSea
     activePlaylistId: player.view === 'playlist' ? player.activePlaylistId : null,
     navigate: player.navigate,
     openPlaylist: player.openPlaylist,
+    openProfile: player.openProfile,
     openCreate: player.openCreate,
     logout: () => {
       void player.logout();
@@ -98,6 +99,7 @@ export default function AppShell({ navLabel, children, headerRight, autoFocusSea
         footerHeight={footerHeight}
         onNavigate={app.navigate}
         onOpenPlaylist={app.openPlaylist}
+        onOpenProfile={app.openProfile}
         onCreatePlaylist={app.openCreate}
         onLogout={app.logout}
       />

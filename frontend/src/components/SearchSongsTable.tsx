@@ -2,11 +2,12 @@ import { Heart } from 'lucide-react';
 import { cx } from '../lib/utils';
 import Equalizer from './Equalizer';
 import TrackThumb from './TrackThumb';
+import AddToPlaylistButton from './AddToPlaylistMenu';
 import type { Track } from '../types';
 
-const COLS = 'grid grid-cols-[32px_minmax(0,1fr)_56px_32px] items-center sm:grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_80px_40px]';
+const COLS = 'grid grid-cols-[32px_minmax(0,1fr)_56px_64px] items-center sm:grid-cols-[40px_minmax(0,1fr)_minmax(0,1fr)_80px_64px]';
 // Without the album column (e.g. playlists of music videos with no album data).
-const COLS_NO_ALBUM = 'grid grid-cols-[32px_minmax(0,1fr)_56px_32px] items-center sm:grid-cols-[40px_minmax(0,1fr)_80px_40px]';
+const COLS_NO_ALBUM = 'grid grid-cols-[32px_minmax(0,1fr)_56px_64px] items-center sm:grid-cols-[40px_minmax(0,1fr)_80px_64px]';
 
 interface SearchSongsTableProps {
   tracks: Track[];
@@ -65,9 +66,10 @@ export default function SearchSongsTable({
                 <p className="truncate text-[12px] leading-4 text-muted">{t.artist}</p>
               </div>
             </div>
-            {showAlbum && <p className="hidden truncate pr-4 text-[12px] sm:block leading-4 text-muted">{t.album || '-'}</p>}
+            {showAlbum && <p className="hidden truncate pr-4 text-[12px] leading-4 text-muted sm:block">{t.album || '-'}</p>}
             <p className="pr-2 text-right text-[12px] leading-4 text-muted sm:pr-[18px]">{t.duration}</p>
-            <div className="flex justify-center">
+            <div className="flex items-center justify-center gap-2 pr-2">
+              <AddToPlaylistButton track={t} className="py-1" />
               <button
                 type="button"
                 aria-label={liked ? 'Unlike' : 'Like'}

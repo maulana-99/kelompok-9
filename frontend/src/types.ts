@@ -81,40 +81,46 @@ export interface Track {
   thumbnail?: string;
 }
 
-export interface PlaylistMeta {
-  volume: string;
-  code: string;
-  format: string;
-  length: string;
-}
-
 export interface Playlist {
+  /** Backend numeric id, as string. */
   id: string;
   name: string;
   description: string;
-  trackCount?: number;
-  durationLabel?: string;
+  status: 'public' | 'private';
+  userId: number;
+  /** music ids (videoId) in insertion order. */
   trackIds: string[];
-  cover?: string | null;
-  meta?: PlaylistMeta;
+  /** music id -> playlist_song row id (dipakai untuk hapus lagu). */
+  songRowIds: Record<string, number>;
+  /** music id -> created_at (ISO) lagu ditambahkan. */
+  songAdded: Record<string, string>;
 }
 
 export interface CreatePlaylistInput {
   name: string;
   description: string;
-  trackIds: string[];
-  cover: string | null;
+  status: 'public' | 'private';
+}
+
+export interface UpdatePlaylistInput {
+  title?: string;
+  description?: string;
 }
 
 export interface BackendPlaylist {
-  id: string;
-  name: string;
+  id: number;
+  title: string;
   description: string;
-  cover: string | null;
-  track_count: number;
-  duration_label: string;
-  track_ids: string[];
-  tracks: Track[];
+  user_id: number;
+  status: 'public' | 'private';
+  created_at: string;
+}
+
+export interface BackendPlaylistSong {
+  id: number;
+  playlist_id: number;
+  music_id: string;
+  created_at: string;
 }
 
 export interface AppUser {
@@ -124,7 +130,7 @@ export interface AppUser {
   created_at?: string;
 }
 
-export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library' | 'liked-songs';
+export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library' | 'liked-songs' | 'profile';
 
 /** Halaman yang bisa dibuka dari menu sidebar. */
 export type NavTarget = 'home' | 'search' | 'library' | 'liked-songs';
@@ -143,6 +149,7 @@ export interface AppContext {
   activePlaylistId: string | null;
   navigate: (target: NavTarget) => void;
   openPlaylist: (id: string) => void;
+  openProfile: (id: number | string) => void;
   openCreate: () => void;
   logout: () => void;
   back: () => void;

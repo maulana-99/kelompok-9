@@ -20,10 +20,13 @@ export const toTrack = (result: MusicSearchResult): Track => {
   };
 };
 
-/** "3:20" -> 200 */
+/** "3:20" / "1:02:33" -> detik */
 export const toSeconds = (mmss = '0:00'): number => {
-  const [m, s] = mmss.split(':').map(Number);
-  return m * 60 + (s || 0);
+  const parts = mmss.split(':').map(Number);
+  if (parts.some(Number.isNaN)) return 0;
+  const [hours, minutes, seconds] =
+    parts.length === 3 ? parts : [0, parts[0] ?? 0, parts[1] ?? 0];
+  return hours * 3600 + minutes * 60 + seconds;
 };
 
 /** 200 -> "3:20" */

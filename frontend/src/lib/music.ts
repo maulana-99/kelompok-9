@@ -18,6 +18,25 @@ export function thumbUrl(rawUrl: string): string {
   return `${API_URL}/music/thumb?url=${encodeURIComponent(rawUrl)}`;
 }
 
+// GET /music/info?ids=a,b,c — metadata lagu untuk music_id tersimpan
+// (dipakai untuk hydrate isi playlist setelah reload).
+export async function fetchMusicInfos(ids: string[]): Promise<MusicSearchResult[]> {
+  const unique = [...new Set(ids)].filter(Boolean);
+  if (unique.length === 0) return [];
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < unique.length; i += 100) {
+    chunks.push(unique.slice(i, i + 100));
+  }
+
+  const batches = await Promise.all(
+    chunks.map((chunk) =>
+      api<MusicSearchResult[]>(`/music/info?ids=${chunk.map(encodeURIComponent).join(',')}`),
+    ),
+  );
+  return batches.flat();
+}
+
 // GET /music/genres — kategori jelajah (mood & genre) dari YouTube Music
 export async function getGenres(): Promise<MusicGenre[]> {
   return api<MusicGenre[]>('/music/genres');

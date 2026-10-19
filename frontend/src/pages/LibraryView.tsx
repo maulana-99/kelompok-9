@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Plus, ListMusic, Play, Pause, Heart, Search, LayoutGrid, List, Sparkles } from 'lucide-react';
+import { Plus, Play, Pause, Heart, Search, LayoutGrid, List, Sparkles } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
-import { cx } from '../lib/utils';
+import { cx, toDurationLabel, toSeconds } from '../lib/utils';
 import { usePlayer } from '../context/PlayerContext';
+import PlaylistCover from '../components/PlaylistCover';
 import type { Track } from '../types';
-
-const BARS = ['h-2', 'h-5', 'h-7', 'h-3', 'h-6', 'h-2', 'h-4'];
 
 export default function LibraryView() {
   const {
@@ -46,7 +45,7 @@ export default function LibraryView() {
   }, [playlists, searchQuery, filter]);
 
   const totalTracks = useMemo(() => {
-    return playlists.reduce((acc, p) => acc + (p.trackCount ?? p.trackIds.length), 0);
+    return playlists.reduce((acc, p) => acc + p.trackIds.length, 0);
   }, [playlists]);
 
   const showLikedCard = filter === 'all' || filter === 'liked';
@@ -183,7 +182,7 @@ export default function LibraryView() {
           {/* User Playlists */}
           {showPlaylists &&
             filteredPlaylists.map((p) => {
-              const count = p.trackCount ?? p.trackIds.length;
+              const count = p.trackIds.length;
               const playableId = firstStreamable(p.trackIds);
               const isPlaylistPlaying = isPlaying && p.trackIds.includes(currentTrackId ?? '');
 
@@ -193,35 +192,9 @@ export default function LibraryView() {
                   onClick={() => openPlaylist(p.id)}
                   className="group relative flex cursor-pointer flex-col border border-line/50 bg-sunken/60 p-4 transition-all hover:border-line hover:bg-card"
                 >
-                  {/* Playlist Cover Art */}
+                  {/* Playlist Cover Art — mosaiik 4 lagu pertama */}
                   <div className="relative mb-3 flex aspect-square w-full items-center justify-center overflow-hidden border border-line/40 bg-line">
-                    {p.cover ? (
-                      <img
-                        src={p.cover}
-                        alt={`${p.name} cover`}
-                        className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                    ) : p.meta ? (
-                      <div className="flex size-full flex-col justify-between bg-gradient-to-br from-raised via-card to-sunken p-3">
-                        <div className="flex justify-between text-[9px] font-semibold uppercase text-primary-soft">
-                          <span>{p.meta.volume}</span>
-                          <span className="text-muted">{p.meta.length}</span>
-                        </div>
-                        <div className="flex flex-col items-center">
-                          <span className="text-[20px] font-bold tracking-tight text-ink">{p.meta.code}</span>
-                          <div className="mt-1 flex h-4 items-end gap-0.5">
-                            {BARS.map((h, i) => (
-                              <span key={i} className={cx('w-0.5 bg-primary', h)} />
-                            ))}
-                          </div>
-                        </div>
-                        <span className="text-[9px] uppercase text-muted truncate">{p.name}</span>
-                      </div>
-                    ) : (
-                      <div className="flex size-full flex-col items-center justify-center bg-gradient-to-br from-card to-sunken text-muted">
-                        <ListMusic className="size-10 text-muted/60" strokeWidth={1.5} />
-                      </div>
-                    )}
+                    <PlaylistCover tracks={listFor(p.trackIds)} className="size-full" />
 
                     {/* Floating Play Button on Hover */}
                     {playableId && (
@@ -254,7 +227,7 @@ export default function LibraryView() {
                     {p.name}
                   </h3>
                   <p className="truncate pt-0.5 text-[12px] leading-4 text-muted">
-                    {count} {count === 1 ? 'song' : 'songs'} • {p.durationLabel || '0 min'}
+                    {count} {count === 1 ? 'song' : 'songs'} • {toDurationLabel(listFor(p.trackIds).reduce((sum, t) => sum + toSeconds(t.duration), 0))}
                   </p>
                 </div>
               );
@@ -286,7 +259,8 @@ export default function LibraryView() {
 
           {showPlaylists &&
             filteredPlaylists.map((p) => {
-              const count = p.trackCount ?? p.trackIds.length;
+              const count = p.trackIds.length;
+              const durationLabel = toDurationLabel(listFor(p.trackIds).reduce((sum, t) => sum + toSeconds(t.duration), 0));
               return (
                 <div
                   key={p.id}
@@ -294,13 +268,7 @@ export default function LibraryView() {
                   className="group flex cursor-pointer items-center justify-between p-4 transition-colors hover:bg-card"
                 >
                   <div className="flex min-w-0 items-center gap-4">
-                    <div className="flex size-12 shrink-0 items-center justify-center bg-card border border-line/40 overflow-hidden">
-                      {p.cover ? (
-                        <img src={p.cover} alt={p.name} className="size-full object-cover" />
-                      ) : (
-                        <ListMusic className="size-5 text-muted" />
-                      )}
-                    </div>
+                    <PlaylistCover tracks={listFor(p.trackIds)} className="size-12 shrink-0 border border-line/40" iconClassName="size-4 text-muted" />
                     <div className="min-w-0">
                       <h4 className="truncate text-[14px] font-semibold text-ink group-hover:text-primary">
                         {p.name}
@@ -312,7 +280,7 @@ export default function LibraryView() {
                   </div>
                   <div className="flex items-center gap-6 text-[12px] text-muted">
                     <span>{count} tracks</span>
-                    <span className="hidden sm:inline">{p.durationLabel}</span>
+                    <span className="hidden sm:inline">{durationLabel}</span>
                   </div>
                 </div>
               );
