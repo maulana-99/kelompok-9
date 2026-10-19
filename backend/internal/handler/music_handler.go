@@ -135,8 +135,16 @@ func firstInvalidID(ids []string) string {
 }
 
 // GET /api/v1/music/:musicId/stream
+// xargsPattern limits the debug-only ?xargs= override to plain yt-dlp
+// extractor args (e.g. youtube:player_client=web_music).
+var xargsPattern = regexp.MustCompile(`^[A-Za-z0-9_:=,;.-]{1,200}$`)
+
 func (h *MusicHandler) Stream(c *gin.Context) {
-	upstream, err := h.service.OpenStream(c.Request.Context(), c.Param("musicId"), c.GetHeader("Range"))
+	ctx := c.Request.Context()
+	if xargs := c.Query("xargs"); xargsPattern.MatchString(xargs) {
+		ctx = service.WithDebugExtractorArgs(ctx, xargs)
+	}
+	upstream, err := h.service.OpenStream(ctx, c.Param("musicId"), c.GetHeader("Range"))
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidMusicID):

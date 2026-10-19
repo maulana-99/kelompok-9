@@ -695,6 +695,14 @@ func (s *musicService) resolveStream(ctx context.Context, videoID string) (strin
 	if debug {
 		args = append(args, "-v")
 	}
+	// YTDLP_EXTRACTOR_ARGS tunes yt-dlp per host, e.g. youtube:player_client=web_music.
+	extractorArgs := os.Getenv("YTDLP_EXTRACTOR_ARGS")
+	if v, _ := ctx.Value(extractorArgsKey{}).(string); debug && v != "" {
+		extractorArgs = v
+	}
+	if extractorArgs != "" {
+		args = append(args, "--extractor-args", extractorArgs)
+	}
 	args = append(args, "https://www.youtube.com/watch?v="+videoID)
 	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
 	var stdout, stderr bytes.Buffer
@@ -784,6 +792,14 @@ func (s *musicService) OpenThumbnail(ctx context.Context, rawURL string) (*http.
 
 // firstMeaningfulLine skips stderr lines that are just noise
 // (e.g. Python deprecation warnings from yt-dlp).
+type extractorArgsKey struct{}
+
+// WithDebugExtractorArgs sets yt-dlp --extractor-args for one request. It is
+// ignored unless YTDLP_DEBUG is set; used to try player clients on Render.
+func WithDebugExtractorArgs(ctx context.Context, extractorArgs string) context.Context {
+	return context.WithValue(ctx, extractorArgsKey{}, extractorArgs)
+}
+
 var (
 	cookieOnce sync.Once
 	cookiePath string
