@@ -85,15 +85,21 @@ export default function AddToPlaylistButton({ track, className = '', iconSize = 
       if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return;
       setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // Esc hanya menutup menu ini, bukan panel/halaman di belakangnya. Capture phase:
+      // tombol & menu memanggil stopPropagation, jadi fase bubble tidak pernah sampai.
+      e.preventDefault();
+      setOpen(false);
+    };
     const close = () => setOpen(false);
     document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true);
     window.addEventListener('scroll', close, true);
     window.addEventListener('resize', close);
     return () => {
       document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, true);
       window.removeEventListener('scroll', close, true);
       window.removeEventListener('resize', close);
     };

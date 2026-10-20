@@ -45,3 +45,34 @@ type MusicPlaylistDetail struct {
 	Thumbnail string        `json:"thumbnail"`
 	Tracks    []MusicResult `json:"tracks"`
 }
+
+// MusicMix adalah mix personal (mirip "My Mix" YouTube Music / "Daily Mix" Spotify),
+// dibangun dari satu cluster lagu yang sering didengar user.
+type MusicMix struct {
+	ID        string        `json:"id"` // video_id seed utama
+	Title     string        `json:"title"`
+	Subtitle  string        `json:"subtitle"`
+	Thumbnail string        `json:"thumbnail"`
+	Seeds     []string      `json:"seeds"`
+	Tracks    []MusicResult `json:"tracks"`
+}
+
+// Recommendations adalah respons GET /api/v1/recommendations.
+type Recommendations struct {
+	Mixes  []MusicMix    `json:"mixes"`
+	ForYou []MusicResult `json:"for_you"`
+}
+
+// MixTrack adalah satu lagu di mix per lagu (GET /music/:musicId/mix) beserta alasannya:
+// "seed" (lagu awal), "artist" (artis sama), "similar" (mirip/segenre),
+// "for_you" (cocok dengan seleramu) atau "favorite" (sering kamu putar).
+type MixTrack struct {
+	MusicResult
+	Reason string `json:"reason"`
+}
+
+// MusicLyrics adalah lirik teks biasa (tanpa timing) dari tab "Lirik" YouTube Music.
+type MusicLyrics struct {
+	Text   string `json:"text"`
+	Source string `json:"source,omitempty"`
+}

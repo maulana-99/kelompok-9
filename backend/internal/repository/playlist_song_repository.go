@@ -13,6 +13,8 @@ type PlaylistSongRepository interface {
 	FindByID(id int) (*model.PlaylistSong, error)
 	Create(song *model.PlaylistSong) error
 	Delete(id int) error
+	// MusicIDsByOwner lists music_id of every song in playlists owned by userID.
+	MusicIDsByOwner(userID int) ([]string, error)
 }
 
 type playlistSongRepository struct {
@@ -54,6 +56,15 @@ func (r *playlistSongRepository) Create(song *model.PlaylistSong) error {
 
 func (r *playlistSongRepository) Delete(id int) error {
 	return r.db.Delete(&model.PlaylistSong{}, id).Error
+}
+
+func (r *playlistSongRepository) MusicIDsByOwner(userID int) ([]string, error) {
+	var ids []string
+	err := r.db.Model(&model.PlaylistSong{}).
+		Joins("JOIN playlist ON playlist.id = playlist_song.playlist_id").
+		Where("playlist.user_id = ?", userID).
+		Distinct().Pluck("playlist_song.music_id", &ids).Error
+	return ids, err
 }
 
 var ErrDuplicate = errors.New("lagu sudah ada di playlist")

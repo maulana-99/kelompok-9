@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Library, ListMusic, Plus, Search, type LucideIcon } from 'lucide-react';
 import EmptyState from '../components/EmptyState';
@@ -8,14 +9,16 @@ import RecentTrackList from '../components/RecentTrackList';
 import SectionHeading from '../components/SectionHeading';
 import { useAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
-import { getGenre, getGenres } from '../lib/music';
+import { getGenre, getGenres, getRecommendations } from '../lib/music';
 import { useAsync } from '../lib/useAsync';
-import type { MusicGenre } from '../types';
+import { toTrack } from '../lib/utils';
+import type { MusicGenre, MusicMix } from '../types';
 
 // Categories shown on Home (YouTube names with hl=id); the rest are filled from the genre list.
 const FEATURED = ['indonesian pop', 'santai', 'hip-hop', 'k-pop', 'semangat!', 'dangdut', 'pop', 'r&b & soul'];
 const SHELF_COUNT = 8;
 const SHELF_SIZE = 5;
+const FOR_YOU_SIZE = 10;
 
 function pickFeatured(genres: MusicGenre[]): MusicGenre[] {
   const featured = FEATURED.map((name) => genres.find((g) => g.name.toLowerCase() === name)).filter(
@@ -54,6 +57,53 @@ function GenreShelf({ genre }: { genre: MusicGenre }) {
   );
 }
 
+/** "Mix untuk kamu" + "Rekomendasi untuk kamu" dari GET /recommendations. Kosong saat user belum punya riwayat. */
+function ForYouSections() {
+  const navigate = useNavigate();
+  const { token, user } = useAuth();
+  const { currentTrackId, isPlaying, playMix, rememberTracks } = usePlayer();
+  const { data } = useAsync(`recs:${user?.id ?? ''}`, () =>
+    token ? getRecommendations(token) : Promise.resolve(null),
+  );
+  const forYou = useMemo(() => data?.for_you.slice(0, FOR_YOU_SIZE).map(toTrack) ?? [], [data]);
+
+  // Lagu harus dikenal player dulu sebelum bisa diputar.
+  useEffect(() => {
+    if (forYou.length) rememberTracks(forYou);
+  }, [forYou, rememberTracks]);
+
+  const openMix = (mix: MusicMix) => navigate(`/mix/${encodeURIComponent(mix.id)}`, { state: { mix } });
+
+  return (
+    <>
+      {data && data.mixes.length > 0 && (
+        <section>
+          <SectionHeading title="Mix untuk kamu" />
+          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:-mx-8 sm:gap-5 sm:px-8 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0 lg:pb-0">
+            {data.mixes.map((mix) => (
+              <div key={mix.id} className="w-40 min-w-0 shrink-0 sm:w-44 lg:w-auto">
+                <MusicPlaylistCard playlist={mix} onOpen={() => openMix(mix)} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {forYou.length > 0 && (
+        <section>
+          <SectionHeading title="Rekomendasi untuk kamu" />
+          <RecentTrackList
+            items={forYou}
+            currentTrackId={currentTrackId}
+            isPlaying={isPlaying}
+            onPlay={playMix}
+          />
+        </section>
+      )}
+    </>
+  );
+}
+
 function greeting(hour: number): string {
   if (hour < 11) return 'Selamat pagi';
   if (hour < 15) return 'Selamat siang';
@@ -88,7 +138,7 @@ export default function HomeView() {
     likedIds,
     currentTrackId,
     isPlaying,
-    playTrack,
+    playMix,
     openPlaylist,
     openCreate,
     navigate: navigateTo,
@@ -124,10 +174,12 @@ export default function HomeView() {
             items={recentTracks}
             currentTrackId={currentTrackId}
             isPlaying={isPlaying}
-            onPlay={(id) => playTrack(id, recentTracks)}
+            onPlay={playMix}
           />
         </section>
       )}
+
+      <ForYouSections />
 
       {shelves.map((g) => (
         <GenreShelf key={g.id} genre={g} />

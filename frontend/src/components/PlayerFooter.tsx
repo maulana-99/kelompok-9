@@ -7,15 +7,17 @@ import {
   Play,
   Pause,
   Repeat,
+  Repeat1,
   Mic2,
   ListMusic,
   MonitorSpeaker,
   Volume2,
 } from 'lucide-react';
-import { cx, toClock } from '../lib/utils';
+import { REPEAT_LABEL, cx, toClock } from '../lib/utils';
 import TrackThumb from './TrackThumb';
 import AddToPlaylistButton from './AddToPlaylistMenu';
-import type { Track } from '../types';
+import type { RepeatMode, Track } from '../types';
+import type { NowPlayingTab } from './NowPlaying';
 
 interface PlayerFooterProps {
   track: Track | null;
@@ -30,6 +32,14 @@ interface PlayerFooterProps {
   onNext: () => void;
   onSeek: (seconds: number) => void;
   onVolume: (volume: number) => void;
+  shuffle: boolean;
+  onToggleShuffle: () => void;
+  repeat: RepeatMode;
+  onCycleRepeat: () => void;
+  /** Tab halaman "Sedang diputar" yang terbuka (null = tertutup). */
+  nowPlaying: NowPlayingTab | null;
+  /** Buka/tutup halaman "Sedang diputar" di tab tertentu. */
+  onNowPlaying: (tab: NowPlayingTab) => void;
 }
 
 /** Bottom player bar (persisten di semua halaman setelah login). */
@@ -46,6 +56,12 @@ export default function PlayerFooter({
   onNext,
   onSeek,
   onVolume,
+  shuffle,
+  onToggleShuffle,
+  repeat,
+  onCycleRepeat,
+  nowPlaying,
+  onNowPlaying,
 }: PlayerFooterProps) {
   const percent = total ? Math.min(100, (progress / total) * 100) : 0;
 
@@ -66,18 +82,28 @@ export default function PlayerFooter({
 
       {/* Now playing */}
       <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-[14px] lg:w-[308px] lg:flex-none">
-        <TrackThumb track={track} className="size-11 shrink-0 border-line/60 bg-line sm:size-12" iconClassName="size-4 text-primary-soft" />
-        <div className="min-w-0">
-          <div className="flex items-center gap-[6px]">
-            <p className="truncate text-[14px] font-semibold leading-5 text-ink">
-              {track ? track.title : 'Belum ada lagu'}
-            </p>
-            {track && track.explicit && (
-              <span className="bg-primary/10 px-1 text-[10px] font-semibold leading-[15px] text-primary">E</span>
-            )}
+        {/* Klik artwork/judul membuka halaman "Sedang diputar" (juga satu-satunya jalan ke antrean di HP). */}
+        <button
+          type="button"
+          aria-label="Buka pemutar"
+          aria-expanded={nowPlaying !== null}
+          onClick={() => onNowPlaying('queue')}
+          disabled={!track}
+          className="flex min-w-0 items-center gap-3 text-left sm:gap-[14px]"
+        >
+          <TrackThumb track={track} className="size-11 shrink-0 border-line/60 bg-line sm:size-12" iconClassName="size-4 text-primary-soft" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-[6px]">
+              <p className="truncate text-[14px] font-semibold leading-5 text-ink">
+                {track ? track.title : 'Belum ada lagu'}
+              </p>
+              {track && track.explicit && (
+                <span className="bg-primary/10 px-1 text-[10px] font-semibold leading-[15px] text-primary">E</span>
+              )}
+            </div>
+            <p className="truncate text-[12px] leading-4 text-muted">{track ? track.artist : 'Pilih lagu dari hasil pencarian'}</p>
           </div>
-          <p className="truncate text-[12px] leading-4 text-muted">{track ? track.artist : 'Pilih lagu dari hasil pencarian'}</p>
-        </div>
+        </button>
         <AddToPlaylistButton track={track} iconSize="size-[15px]" className="py-1" />
         <button
           type="button"
@@ -94,7 +120,14 @@ export default function PlayerFooter({
       {/* Controls */}
       <div className="flex shrink-0 flex-col items-center justify-center sm:w-[576px] sm:max-w-[672px] sm:shrink sm:px-4">
         <div className="flex items-center gap-4 sm:gap-5 sm:pb-1">
-          <button type="button" aria-label="Shuffle" className={cx(ghostBtn, 'hidden sm:block')}>
+          <button
+            type="button"
+            aria-label="Acak"
+            aria-pressed={shuffle}
+            title={shuffle ? 'Acak: aktif' : 'Acak: mati'}
+            onClick={onToggleShuffle}
+            className={cx(ghostBtn, 'hidden sm:block', shuffle && 'text-primary')}
+          >
             <Shuffle className="size-3" />
           </button>
           <button type="button" aria-label="Previous" onClick={onPrev} disabled={!track} className={cx(ghostBtn, !track && 'cursor-not-allowed opacity-40')}>
@@ -116,8 +149,14 @@ export default function PlayerFooter({
           <button type="button" aria-label="Next" onClick={onNext} disabled={!track} className={cx(ghostBtn, !track && 'cursor-not-allowed opacity-40')}>
             <SkipForward className="size-[11px]" fill="currentColor" />
           </button>
-          <button type="button" aria-label="Repeat" className={cx(ghostBtn, 'hidden sm:block')}>
-            <Repeat className="size-[14px]" />
+          <button
+            type="button"
+            aria-label={REPEAT_LABEL[repeat]}
+            title={REPEAT_LABEL[repeat]}
+            onClick={onCycleRepeat}
+            className={cx(ghostBtn, 'hidden sm:block', repeat !== 'off' && 'text-primary')}
+          >
+            {repeat === 'one' ? <Repeat1 className="size-[14px]" /> : <Repeat className="size-[14px]" />}
           </button>
         </div>
 
@@ -141,10 +180,23 @@ export default function PlayerFooter({
 
       {/* Right controls */}
       <div className="hidden w-[308px] min-w-[200px] items-center justify-end gap-[14px] lg:flex">
-        <button type="button" aria-label="Lyrics" className={ghostBtn}>
+        <button
+          type="button"
+          aria-label="Lirik"
+          aria-pressed={nowPlaying === 'lyrics'}
+          onClick={() => onNowPlaying('lyrics')}
+          disabled={!track}
+          className={cx(ghostBtn, nowPlaying === 'lyrics' && 'text-primary', !track && 'cursor-not-allowed opacity-40')}
+        >
           <Mic2 className="size-4" />
         </button>
-        <button type="button" aria-label="Queue" className={ghostBtn}>
+        <button
+          type="button"
+          aria-label="Antrean"
+          aria-pressed={nowPlaying === 'queue'}
+          onClick={() => onNowPlaying('queue')}
+          className={cx(ghostBtn, nowPlaying === 'queue' && 'text-primary')}
+        >
           <ListMusic className="size-[15px]" />
         </button>
         <button type="button" aria-label="Devices" className={ghostBtn}>

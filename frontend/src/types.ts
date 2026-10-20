@@ -57,6 +57,29 @@ export interface MusicPlaylist {
   thumbnail: string;
 }
 
+/** Mix personal — GET /recommendations (seperti "My Mix" / "Daily Mix"). */
+export interface MusicMix {
+  id: string;
+  title: string;
+  subtitle: string;
+  thumbnail: string;
+  seeds: string[];
+  tracks: MusicSearchResult[];
+}
+
+/** Asal lagu di mix per lagu — GET /music/:musicId/mix. */
+export type MixReason = 'seed' | 'artist' | 'similar' | 'for_you' | 'favorite';
+
+/** Mode ulangi seperti YouTube Music: mati -> semua (antrean) -> satu lagu. */
+export type RepeatMode = 'off' | 'all' | 'one';
+
+export type MixTrack = MusicSearchResult & { reason: MixReason };
+
+export interface Recommendations {
+  mixes: MusicMix[];
+  for_you: MusicSearchResult[];
+}
+
 export interface MusicGenreDetail {
   name: string;
   playlists: MusicPlaylist[];
@@ -116,6 +139,13 @@ export interface BackendPlaylist {
   created_at: string;
 }
 
+export interface BackendHistoryEntry {
+  id: number;
+  user_id: number;
+  music_id: string;
+  last_played: string;
+}
+
 export interface BackendPlaylistSong {
   id: number;
   playlist_id: number;
@@ -168,4 +198,10 @@ export interface AppContext {
   nextTrack: () => void;
   seek: (seconds: number) => void;
   setVolume: (volume: number) => void;
+}
+
+/** GET /music/:musicId/lyrics — lirik teks biasa (tanpa timing). */
+export interface MusicLyrics {
+  text: string;
+  source?: string;
 }

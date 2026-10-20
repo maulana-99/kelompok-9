@@ -33,6 +33,9 @@ func New(db *gorm.DB) *gin.Engine {
 	playlistHandler := handler.NewPlaylistHandler(playlistService, authService)
 	playlistSongHandler := handler.NewPlaylistSongHandler(playlistSongService, authService)
 
+	historyRepo := repository.NewHistoryRepository(db)
+	historyHandler := handler.NewHistoryHandler(service.NewHistoryService(historyRepo))
+
 	v1 := r.Group("/api/v1")
 	{
 		auth := v1.Group("/auth")
@@ -64,6 +67,9 @@ func New(db *gorm.DB) *gin.Engine {
 		// --- Music (YouTube Music scraping, no local tables) ---
 		musicService := service.NewMusicService()
 		musicHandler := handler.NewMusicHandler(musicService)
+		recommendationHandler := handler.NewRecommendationHandler(
+			service.NewRecommendationService(historyRepo, playlistSongRepo, musicService),
+		)
 
 		music := v1.Group("/music")
 		{
@@ -74,6 +80,9 @@ func New(db *gorm.DB) *gin.Engine {
 			music.GET("/genres/:genreId", musicHandler.GenrePlaylists)
 			music.GET("/playlists/:playlistId", musicHandler.Playlist)
 			music.GET("/:musicId/stream", musicHandler.Stream)
+			music.GET("/:musicId/radio", requireAuth, musicHandler.Radio)
+			music.GET("/:musicId/mix", requireAuth, recommendationHandler.SongMix)
+			music.GET("/:musicId/lyrics", requireAuth, musicHandler.Lyrics)
 		}
 
 		// --- Playlists & songs inside playlists (API design 5 & 6) ---
@@ -89,6 +98,17 @@ func New(db *gorm.DB) *gin.Engine {
 			playlists.POST("/:id/songs", requireAuth, playlistSongHandler.Add)
 			playlists.DELETE("/:id/songs/:songId", requireAuth, playlistSongHandler.Delete)
 		}
+
+		// --- Listening history of the logged-in user (API design 8) ---
+		history := v1.Group("/history", requireAuth)
+		{
+			history.POST("", historyHandler.Record)
+			history.GET("", historyHandler.List)
+			history.DELETE("", historyHandler.Clear)
+		}
+
+		// Personal mixes built from history + playlists (see recommendation_service.go)
+		v1.GET("/recommendations", requireAuth, recommendationHandler.ForUser)
 
 		// Add other resources here, e.g.:
 		// products := v1.Group("/products")

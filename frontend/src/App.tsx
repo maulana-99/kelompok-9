@@ -12,6 +12,7 @@ import ProfileView from './pages/ProfileView';
 import SearchView from './pages/SearchView';
 import GenreView from './pages/GenreView';
 import ExplorePlaylistView from './pages/ExplorePlaylistView';
+import MixView from './pages/MixView';
 import LikedSongs from './pages/likedSongs';
 
 import './index.css';
@@ -116,6 +117,17 @@ function App() {
                 <RequireAuth>
                   <AppShell>
                     <ProfileView />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/mix/:mixId"
+              element={
+                <RequireAuth>
+                  <AppShell>
+                    <MixView />
                   </AppShell>
                 </RequireAuth>
               }

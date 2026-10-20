@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import PlayerFooter from './PlayerFooter';
+import NowPlaying, { type NowPlayingTab } from './NowPlaying';
 import { useAuth } from '../context/AuthContext';
 import { usePlayer } from '../context/PlayerContext';
 import type { AppContext, AppUser } from '../types';
@@ -25,6 +26,9 @@ export default function AppShell({ navLabel, children, headerRight, autoFocusSea
   const location = useLocation();
   // Sidebar is a drawer below the lg breakpoint.
   const [navOpen, setNavOpen] = useState(false);
+  // Halaman "Sedang diputar" (null = tertutup), dibuka dari player bar.
+  const [nowPlaying, setNowPlaying] = useState<NowPlayingTab | null>(null);
+  const closeNowPlaying = useCallback(() => setNowPlaying(null), []);
   const [navPath, setNavPath] = useState(location.pathname);
   if (navPath !== location.pathname) {
     setNavPath(location.pathname);
@@ -135,7 +139,15 @@ export default function AppShell({ navLabel, children, headerRight, autoFocusSea
         onNext={app.nextTrack}
         onSeek={app.seek}
         onVolume={app.setVolume}
+        shuffle={player.shuffle}
+        onToggleShuffle={player.toggleShuffle}
+        repeat={player.repeat}
+        onCycleRepeat={player.cycleRepeat}
+        nowPlaying={nowPlaying}
+        onNowPlaying={(tab) => setNowPlaying((open) => (open === tab ? null : tab))}
       />
+
+      {nowPlaying && <NowPlaying tab={nowPlaying} onTab={setNowPlaying} onClose={closeNowPlaying} />}
     </div>
   );
 }

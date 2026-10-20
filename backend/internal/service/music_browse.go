@@ -43,17 +43,23 @@ var (
 // unknown browseId/params, which is mapped to ErrBrowseNotFound.
 func (s *musicService) browse(ctx context.Context, body map[string]any, out any) error {
 	err := s.callInnertube(ctx, ytmBrowseURL, body, out)
-	var statusErr *upstreamStatusError
-	if errors.As(err, &statusErr) && (statusErr.code == http.StatusBadRequest || statusErr.code == http.StatusNotFound) {
+	if isUpstreamNotFound(err) {
 		return ErrBrowseNotFound
 	}
 	return err
 }
 
+// isUpstreamNotFound reports a 400/404 from innertube (unknown id), as opposed
+// to an outage or rate limit.
+func isUpstreamNotFound(err error) bool {
+	var statusErr *upstreamStatusError
+	return errors.As(err, &statusErr) && (statusErr.code == http.StatusBadRequest || statusErr.code == http.StatusNotFound)
+}
+
 // ---- Genres ----
 
 func (s *musicService) Genres(ctx context.Context) ([]model.MusicGenre, error) {
-	return cachedBrowse(s, "genres", genresCacheTTL, func() ([]model.MusicGenre, error) {
+	return cachedBrowse(ctx, s, "genres", genresCacheTTL, func(ctx context.Context) ([]model.MusicGenre, error) {
 		var parsed ytGenresResponse
 		if err := s.browse(ctx, map[string]any{"browseId": ytmGenresBrowseID}, &parsed); err != nil {
 			return nil, err
@@ -113,7 +119,7 @@ func (s *musicService) GenrePlaylists(ctx context.Context, genreID string) (*mod
 	if !genreIDPattern.MatchString(genreID) {
 		return nil, ErrInvalidBrowseID
 	}
-	return cachedBrowse(s, "genre:"+genreID, categoryCacheTTL, func() (*model.MusicGenreDetail, error) {
+	return cachedBrowse(ctx, s, "genre:"+genreID, categoryCacheTTL, func(ctx context.Context) (*model.MusicGenreDetail, error) {
 		var parsed ytCategoryResponse
 		body := map[string]any{"browseId": ytmCategoryBrowseID, "params": genreID}
 		if err := s.browse(ctx, body, &parsed); err != nil {
@@ -179,7 +185,7 @@ func (s *musicService) Playlist(ctx context.Context, playlistID string) (*model.
 	if !playlistIDPattern.MatchString(playlistID) {
 		return nil, ErrInvalidBrowseID
 	}
-	return cachedBrowse(s, "playlist:"+playlistID, playlistCacheTTL, func() (*model.MusicPlaylistDetail, error) {
+	return cachedBrowse(ctx, s, "playlist:"+playlistID, playlistCacheTTL, func(ctx context.Context) (*model.MusicPlaylistDetail, error) {
 		var parsed ytPlaylistResponse
 		if err := s.browse(ctx, map[string]any{"browseId": playlistID}, &parsed); err != nil {
 			return nil, err
