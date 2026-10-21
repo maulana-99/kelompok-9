@@ -79,6 +79,12 @@ type MusicService interface {
 	GenrePlaylists(ctx context.Context, genreID string) (*model.MusicGenreDetail, error)
 	// Playlist returns the tracks of one YouTube Music playlist.
 	Playlist(ctx context.Context, playlistID string) (*model.MusicPlaylistDetail, error)
+	// Radio returns the YouTube Music radio ("up next") for one song, seed first.
+	Radio(ctx context.Context, videoID string) ([]model.MusicResult, error)
+	// ArtistSongs returns songs by the primary artist of an artist credit ("A & B" -> A).
+	ArtistSongs(ctx context.Context, artist string) ([]model.MusicResult, error)
+	// Lyrics returns the plain-text lyrics YouTube Music shows for one song.
+	Lyrics(ctx context.Context, videoID string) (model.MusicLyrics, error)
 }
 
 type musicService struct {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Music } from 'lucide-react';
 import { cx } from '../lib/utils';
-import { thumbUrl } from '../lib/music';
+import { largeThumb, thumbUrl } from '../lib/music';
 import type { Track } from '../types';
 
 interface TrackThumbProps {
@@ -10,6 +10,8 @@ interface TrackThumbProps {
   className?: string;
   /** Ikon fallback kalau thumbnail tidak ada atau gagal dimuat. */
   iconClassName?: string;
+  /** Minta versi resolusi besar (artwork halaman pemutar). */
+  large?: boolean;
 }
 
 /** Artwork lagu (di-proxy lewat backend). Kalau tidak ada, tampilkan ikon musik. */
@@ -17,9 +19,11 @@ export default function TrackThumb({
   track,
   className = '',
   iconClassName = 'size-[13px] text-muted',
+  large = false,
 }: TrackThumbProps) {
   const [failed, setFailed] = useState(false);
-  const src = track?.thumbnail && !failed ? thumbUrl(track.thumbnail) : '';
+  const raw = track?.thumbnail && !failed ? track.thumbnail : '';
+  const src = raw ? thumbUrl(large ? largeThumb(raw) : raw) : '';
 
   if (!src) {
     return (
@@ -33,7 +37,7 @@ export default function TrackThumb({
     <img
       src={src}
       alt=""
-      loading="lazy"
+      loading={large ? 'eager' : 'lazy'}
       onError={() => setFailed(true)}
       className={cx('shrink-0 border object-cover', className)}
     />

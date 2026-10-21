@@ -7,8 +7,13 @@ type UserListeningHistory struct {
 	UserID     int       `gorm:"not null;index" json:"user_id"`
 	MusicID    string    `gorm:"type:varchar(255)" json:"music_id"`
 	LastPlayed time.Time `gorm:"type:timestamp;default:now()" json:"last_played"`
+	PlayCount  int       `gorm:"not null;default:1" json:"play_count"`
 }
 
 func (UserListeningHistory) TableName() string {
 	return "user_listening_history"
+}
+
+type RecordHistoryRequest struct {
+	MusicID string `json:"music_id" binding:"required"`
 }

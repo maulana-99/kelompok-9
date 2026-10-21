@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { fetchMusicInfos, streamUrl } from '../lib/music';
+import { fetchMusicInfos, getSongMix, streamUrl } from '../lib/music';
 import {
   fetchLikedSongs,
   likeSong,
@@ -17,9 +17,21 @@ import {
   toPlaylist,
   updatePlaylistApi,
 } from '../lib/playlists';
-import { toSeconds, toTrack } from '../lib/utils';
+import { fetchHistory, recordHistory } from '../lib/history';
+import { shuffled, toSeconds, toTrack } from '../lib/utils';
 import ModalCreatePlaylist from '../components/ModalCreatePlaylist';
-import type { AppView, CreatePlaylistInput, NavTarget, Playlist, Track, UpdatePlaylistInput } from '../types';
+import PlayerNotice, { type PlayerNoticeData } from '../components/PlayerNotice';
+import type {
+  AppView,
+  CreatePlaylistInput,
+  MixReason,
+  MixTrack,
+  NavTarget,
+  Playlist,
+  RepeatMode,
+  Track,
+  UpdatePlaylistInput,
+} from '../types';
 
 /** Seluruh state + aksi yang dipakai halaman dan kerangka aplikasi. */
 export interface PlayerStore {
@@ -72,12 +84,26 @@ export interface PlayerStore {
   progress: number;
   volume: number;
   playTrack: (id: string, context?: Track[]) => void;
+  /** Putar satu lagu lalu isi antrean dengan mix dari lagu itu (diacak setiap kali). */
+  playMix: (id: string) => void;
+  /** Lagu berikutnya di antrean + asal tiap lagu mix (artis sama, mirip, dst). */
+  upNext: Track[];
+  /** Lagu antrean sebelum lagu sekarang (sudah diputar), tetap tampil di daftar. */
+  played: Track[];
+  queueReasons: Record<string, MixReason>;
+  playFromQueue: (id: string) => void;
   togglePlay: () => void;
   toggleLike: (id: string) => void;
   seek: (seconds: number) => void;
   setVolume: (volume: number) => void;
   prevTrack: () => void;
   nextTrack: () => void;
+  /** Acak: lagu sisa antrean diacak, lagu yang sedang diputar tetap. Mati = urutan asli kembali. */
+  shuffle: boolean;
+  toggleShuffle: () => void;
+  /** Ulangi: off -> all (antrean diulang, tanpa autoplay mix) -> one (lagu ini diulang). */
+  repeat: RepeatMode;
+  cycleRepeat: () => void;
 
   /** Simpan lagu hasil pencarian agar bisa diputar/ditampilkan di halaman lain. */
   rememberTracks: (tracks: Track[]) => void;
@@ -108,6 +134,20 @@ function readTracksCache(): Track[] {
     );
   } catch {
     return [];
+  }
+}
+
+// Mode acak/ulangi diingat per browser, seperti YouTube Music.
+const MODES_KEY = 'melodi_player_modes';
+const REPEAT_NEXT: Record<RepeatMode, RepeatMode> = { off: 'all', all: 'one', one: 'off' };
+
+function readModes(): { shuffle: boolean; repeat: RepeatMode } {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MODES_KEY) ?? '{}') as { shuffle?: unknown; repeat?: unknown };
+    const repeat = parsed.repeat === 'all' || parsed.repeat === 'one' ? parsed.repeat : 'off';
+    return { shuffle: parsed.shuffle === true, repeat };
+  } catch {
+    return { shuffle: false, repeat: 'off' };
   }
 }
 
@@ -145,6 +185,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [likedIds, setLikedIds] = useState<string[]>([]);
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [queue, setQueue] = useState<string[]>([]);
+  const [queueReasons, setQueueReasons] = useState<Record<string, MixReason>>({});
+  const [shuffle, setShuffle] = useState(() => readModes().shuffle);
+  const [repeat, setRepeat] = useState<RepeatMode>(() => readModes().repeat);
+  // Urutan asli antrean, dipakai lagi saat acak dimatikan.
+  const originalQueue = useRef<string[]>([]);
+  // Dibaca callback async (mix yang baru selesai dimuat): state di closure bisa sudah basi.
+  const shuffleRef = useRef(shuffle);
+  const [notice, setNotice] = useState<PlayerNoticeData | null>(null);
+  const clearNotice = useCallback(() => setNotice(null), []);
 
   // Mirror agar tracksOf tidak tergantung closure state yang basi.
   const knownRef = useRef<Map<string, Track>>(new Map(readTracksCache().map((track) => [track.id, track])));
@@ -366,6 +415,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [token, user?.id, hydrateTracks]);
 
+  // ---- Muat riwayat dengar user dari backend (dipakai Recent di Home) ----
+  useEffect(() => {
+    if (!token) {
+      setRecentIds([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const entries = await fetchHistory(token);
+        if (cancelled) return;
+        const ids = entries.map((entry) => entry.music_id);
+        // Gabung, jangan timpa: lagu yang diputar sebelum fetch selesai tetap di depan.
+        setRecentIds((prev) => [...prev, ...ids.filter((id) => !prev.includes(id))].slice(0, 12));
+        void hydrateTracks(ids);
+      } catch (err) {
+        console.error('gagal memuat riwayat dengar:', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, hydrateTracks]);
+
   // ---- Navigasi ----
   const navigateTo = (target: NavTarget) => {
     if (target === 'home') {
@@ -396,12 +471,20 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   };
 
   // ---- Player ----
-  // Mulai lagu + catat ke riwayat putar sesi ini (dipakai halaman Home).
+  // Mulai lagu + catat ke riwayat dengar (dipakai halaman Home, disimpan di backend).
+  // Naik setiap kali lagu dimulai: hasil radio autoplay yang telat dibuang
+  // bila user sudah memilih lagu lain selama radio dimuat.
+  const autoplayReq = useRef(0);
+
   const startTrack = (id: string) => {
+    autoplayReq.current += 1;
     setCurrentTrackId(id);
     setProgress(0);
     setIsPlaying(true);
     setRecentIds((prev) => [id, ...prev.filter((x) => x !== id)].slice(0, 12));
+    if (token) {
+      recordHistory(id, token).catch((err) => console.error('gagal mencatat riwayat dengar:', err));
+    }
   };
 
   // Antrean lagu: diisi dari daftar yang sedang dilihat user (playlist/hasil search/liked),
@@ -411,7 +494,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!track?.videoId) return;
 
     const contextIds = context?.filter((item) => item.videoId).map((item) => item.id);
-    if (contextIds?.length) setQueue(contextIds);
+    if (contextIds?.length) {
+      autoplayReq.current += 1; // antrean baru: buang mix/autoplay yang masih dimuat
+      setPlayQueue(contextIds, id);
+      setQueueReasons({});
+    }
 
     if (id === currentTrackId) {
       setIsPlaying((p) => !p);
@@ -420,7 +507,100 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     startTrack(id);
   };
 
-  const step = (dir: number) => {
+  // Ganti antrean. Saat acak aktif, `anchor` (lagu yang dipilih) tetap di depan, sisanya diacak.
+  const setPlayQueue = (queueIds: string[], anchor?: string) => {
+    // Satu lagu satu posisi: daftar dengan lagu dobel bikin "sudah diputar"/berikutnya kacau.
+    const ids = [...new Set(queueIds)];
+    originalQueue.current = ids;
+    if (!shuffleRef.current) {
+      setQueue(ids);
+      return;
+    }
+    const rest = shuffled(ids.filter((x) => x !== anchor));
+    setQueue(anchor && ids.includes(anchor) ? [anchor, ...rest] : rest);
+  };
+
+  const toggleShuffle = () => {
+    const next = !shuffle;
+    shuffleRef.current = next;
+    setShuffle(next);
+    setNotice((prev) => ({ id: (prev?.id ?? 0) + 1, kind: 'shuffle', on: next }));
+    if (next) {
+      originalQueue.current = queue;
+      const rest = shuffled(queue.filter((x) => x !== currentTrackId));
+      setQueue(currentTrackId && queue.includes(currentTrackId) ? [currentTrackId, ...rest] : rest);
+    } else {
+      // Urutan asli, plus lagu yang masuk setelah acak dinyalakan (mis. autoplay) di belakang.
+      const kept = originalQueue.current.filter((x) => queue.includes(x));
+      setQueue([...kept, ...queue.filter((x) => !kept.includes(x))]);
+    }
+  };
+
+  const cycleRepeat = () => {
+    const next = REPEAT_NEXT[repeat];
+    setRepeat(next);
+    setNotice((prev) => ({ id: (prev?.id ?? 0) + 1, kind: 'repeat', mode: next }));
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(MODES_KEY, JSON.stringify({ shuffle, repeat }));
+    } catch {
+      // localStorage tidak tersedia — mode hanya berlaku sampai reload.
+    }
+  }, [shuffle, repeat]);
+
+  // Ubah hasil GET /music/:id/mix jadi lagu antrean yang belum ada di `exclude`.
+  const mixToQueue = (mix: MixTrack[], exclude: Set<string>) => {
+    const extra = mix.filter((item) => !exclude.has(item.video_id));
+    const tracks = extra.map(toTrack);
+    rememberTracks(tracks);
+    setQueueReasons((prev) => ({ ...prev, ...Object.fromEntries(extra.map((item) => [item.video_id, item.reason])) }));
+    return tracks;
+  };
+
+  const playMix = (id: string) => {
+    const track = knownRef.current.get(id) ?? knownTracks.find((item) => item.id === id);
+    if (!track?.videoId) return;
+    if (id === currentTrackId) {
+      setIsPlaying((p) => !p);
+      return;
+    }
+
+    setPlayQueue([id], id);
+    setQueueReasons({});
+    startTrack(id);
+    if (!token) return;
+    // startTrack baru saja menaikkan autoplayReq; hasil dibuang bila user pindah lagu.
+    const req = autoplayReq.current;
+    void getSongMix(track.videoId, token)
+      .then((mix) => {
+        if (req !== autoplayReq.current) return;
+        const tracks = mixToQueue(mix, new Set([id]));
+        setPlayQueue([id, ...tracks.map((item) => item.id)], id);
+      })
+      .catch((err) => console.error('gagal memuat mix:', err));
+  };
+
+  const playFromQueue = (id: string) => {
+    if (id === currentTrackId) setIsPlaying((p) => !p);
+    else if (queue.includes(id)) startTrack(id);
+  };
+
+  // Putar ulang lagu ini dari awal. `counted` = lagu selesai sendiri (ulangi), jadi masuk riwayat.
+  const restartCurrent = (counted: boolean) => {
+    const audio = audioRef.current;
+    if (!audio || !currentTrackId) return;
+    audio.currentTime = 0;
+    setProgress(0);
+    if (counted || isPlaying) void audio.play().catch(() => setIsPlaying(false));
+    if (counted && token) {
+      recordHistory(currentTrackId, token).catch((err) => console.error('gagal mencatat riwayat dengar:', err));
+    }
+  };
+
+  // `ended` = dipanggil karena lagu selesai (bukan tombol Next/Prev).
+  const step = (dir: number, ended = false) => {
     const source = queue.length
       ? queue
           .map((id) => knownRef.current.get(id) ?? knownTracks.find((track) => track.id === id))
@@ -430,19 +610,54 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (playable.length === 0) return;
 
     const index = currentTrackId ? playable.findIndex((track) => track.id === currentTrackId) : -1;
+
+    // Autoplay seperti YouTube Music: antrean (mis. playlist) habis -> sambung mix lagu terakhir.
+    const last = playable[index];
+    // Ulangi semua: antrean diputar dari awal lagi, tanpa autoplay mix.
+    if (dir > 0 && repeat === 'off' && queue.length && index === playable.length - 1 && last?.videoId && token) {
+      const req = ++autoplayReq.current;
+      const queued = new Set(playable.map((track) => track.id));
+      void getSongMix(last.videoId, token)
+        .then((mix) => {
+          if (req !== autoplayReq.current) return;
+          const extra = mixToQueue(mix, queued);
+          if (extra.length === 0) {
+            startTrack(playable[0].id);
+            return;
+          }
+          const extraIds = extra.map((track) => track.id);
+          originalQueue.current = [...originalQueue.current, ...extraIds];
+          // Functional update: jangan timpa urutan yang diubah (mis. acak) selama mix dimuat.
+          setQueue((q) => [...q, ...extraIds.filter((x) => !q.includes(x))]);
+          startTrack(extra[0].id);
+        })
+        .catch((err) => {
+          console.error('gagal memuat mix:', err);
+          if (req === autoplayReq.current) startTrack(playable[0].id);
+        });
+      return;
+    }
+
     const base = index === -1 ? (dir > 0 ? -1 : 0) : index;
-    const next = playable[(base + dir + playable.length) % playable.length];
+    // Tanpa antrean (fallback semua lagu yang dikenal), acak = pilih lagu lain secara acak.
+    const others = playable.filter((track) => track.id !== currentTrackId);
+    const next =
+      shuffle && !queue.length && dir > 0 && others.length
+        ? shuffled(others)[0]
+        : playable[(base + dir + playable.length) % playable.length];
 
     if (next.id === currentTrackId) {
-      const audio = audioRef.current;
-      if (audio) {
-        audio.currentTime = 0;
-        setProgress(0);
-        if (isPlaying) void audio.play().catch(() => setIsPlaying(false));
-      }
+      restartCurrent(ended);
       return;
     }
     startTrack(next.id);
+  };
+
+  // Lagu selesai sendiri: ulangi satu = putar lagi dari awal (dihitung sebagai putar ulang);
+  // tombol Next tetap pindah lagu seperti di YouTube Music.
+  const handleEnded = () => {
+    if (repeat === 'one') restartCurrent(true);
+    else step(1, true);
   };
 
   const togglePlay = () => {
@@ -594,6 +809,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     [knownTracks, likedIds],
   );
 
+  const [played, upNext] = useMemo(() => {
+    const index = currentTrackId ? queue.indexOf(currentTrackId) : -1;
+    if (index === -1) return [[], []];
+    const byId = new Map(knownTracks.map((track) => [track.id, track]));
+    const toTracks = (ids: string[]) => ids.map((id) => byId.get(id)).filter((track): track is Track => track !== undefined);
+    return [toTracks(queue.slice(0, index)), toTracks(queue.slice(index + 1))];
+  }, [queue, currentTrackId, knownTracks]);
+
   const store: PlayerStore = {
     view,
     activePlaylistId,
@@ -633,12 +856,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     progress,
     volume,
     playTrack,
+    playMix,
+    upNext,
+    played,
+    queueReasons,
+    playFromQueue,
     togglePlay,
     toggleLike,
     seek,
     setVolume,
     prevTrack: () => step(-1),
     nextTrack: () => step(1),
+    shuffle,
+    toggleShuffle,
+    repeat,
+    cycleRepeat,
 
     rememberTracks,
   };
@@ -650,11 +882,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         preload="metadata"
         onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
-        onEnded={() => step(1)}
+        onEnded={handleEnded}
         onError={() => setIsPlaying(false)}
       />
 
       {children}
+
+      <PlayerNotice notice={notice} onDone={clearNotice} />
 
       {showCreate && (
         <ModalCreatePlaylist onClose={() => setShowCreate(false)} onCreate={createPlaylist} />
