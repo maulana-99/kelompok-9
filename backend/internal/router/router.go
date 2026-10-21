@@ -33,6 +33,10 @@ func New(db *gorm.DB) *gin.Engine {
 	playlistHandler := handler.NewPlaylistHandler(playlistService, authService)
 	playlistSongHandler := handler.NewPlaylistSongHandler(playlistSongService, authService)
 
+	likeRepo := repository.NewLikeRepository(db)
+	likeService := service.NewLikeService(likeRepo)
+	likeHandler := handler.NewLikeHandler(likeService)
+
 	v1 := r.Group("/api/v1")
 	{
 		auth := v1.Group("/auth")
@@ -88,6 +92,15 @@ func New(db *gorm.DB) *gin.Engine {
 			playlists.GET("/:id/songs", playlistSongHandler.List)
 			playlists.POST("/:id/songs", requireAuth, playlistSongHandler.Add)
 			playlists.DELETE("/:id/songs/:songId", requireAuth, playlistSongHandler.Delete)
+		}
+
+		// --- Like Songs (login required) ---
+		likes := v1.Group("/likes")
+		likes.Use(requireAuth)
+		{
+			likes.POST("", likeHandler.Create)
+			likes.GET("", likeHandler.List)
+			likes.DELETE("/:musicId", likeHandler.Delete)
 		}
 
 		// Add other resources here, e.g.:
