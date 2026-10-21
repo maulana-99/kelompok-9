@@ -3,6 +3,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { fetchMusicInfos, getSongMix, streamUrl } from '../lib/music';
 import {
+  fetchLikedSongs,
+  likeSong,
+  unlikeSong,
+} from '../lib/likes';
+import {
   addPlaylistSong,
   createPlaylist as createPlaylistApi,
   deletePlaylistApi,
@@ -336,6 +341,38 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     },
     [knownTracks],
   );
+  
+    // ---- Muat Like Song dari backend ----
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!token || !user?.id) {
+      setLikedIds([]);
+      return;
+    }
+
+    const loadLikedSongs = async () => {
+      try {
+        const likes = await fetchLikedSongs(token);
+        if (cancelled) return;
+
+        const ids = (likes ?? []).map((like) => like.music_id);
+        setLikedIds(ids);
+
+        await hydrateTracks(ids);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Gagal memuat Like Song:', error);
+        }
+      }
+    };
+
+    void loadLikedSongs();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.id, hydrateTracks]);
 
   // ---- Muat playlist milik user dari backend ----
   const loadedForRef = useRef<number | null>(null);
@@ -627,8 +664,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (currentVideoId) setIsPlaying((p) => !p);
   };
 
-  const toggleLike = (id: string) =>
-    setLikedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+    const toggleLike = (id: string) => {
+    if (!token) {
+      console.error('Silakan login untuk menggunakan Like Song.');
+      return;
+    }
+
+    const isLiked = likedIds.includes(id);
+    const musicId = knownRef.current.get(id)?.videoId ?? id;
+
+    void (async () => {
+      try {
+        if (isLiked) {
+          await unlikeSong(musicId, token);
+          setLikedIds((ids) => ids.filter((item) => item !== id));
+        } else {
+          await likeSong(musicId, token);
+          setLikedIds((ids) =>
+            ids.includes(id) ? ids : [...ids, id],
+          );
+        }
+      } catch (error) {
+        console.error('Gagal memperbarui Like Song:', error);
+      }
+    })();
+  };
 
   const seek = (seconds: number) => {
     const audio = audioRef.current;

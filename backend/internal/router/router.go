@@ -33,6 +33,9 @@ func New(db *gorm.DB) *gin.Engine {
 	playlistHandler := handler.NewPlaylistHandler(playlistService, authService)
 	playlistSongHandler := handler.NewPlaylistSongHandler(playlistSongService, authService)
 
+	likeRepo := repository.NewLikeRepository(db)
+	likeService := service.NewLikeService(likeRepo)
+	likeHandler := handler.NewLikeHandler(likeService)
 	historyRepo := repository.NewHistoryRepository(db)
 	historyHandler := handler.NewHistoryHandler(service.NewHistoryService(historyRepo))
 
@@ -97,6 +100,15 @@ func New(db *gorm.DB) *gin.Engine {
 			playlists.GET("/:id/songs", playlistSongHandler.List)
 			playlists.POST("/:id/songs", requireAuth, playlistSongHandler.Add)
 			playlists.DELETE("/:id/songs/:songId", requireAuth, playlistSongHandler.Delete)
+		}
+
+		// --- Like Songs (login required) ---
+		likes := v1.Group("/likes")
+		likes.Use(requireAuth)
+		{
+			likes.POST("", likeHandler.Create)
+			likes.GET("", likeHandler.List)
+			likes.DELETE("/:musicId", likeHandler.Delete)
 		}
 
 		// --- Listening history of the logged-in user (API design 8) ---
