@@ -58,7 +58,7 @@ export default function Sidebar({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {/* Brand */}
         <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line/40 px-6">
-          <div className="flex size-8 items-center justify-center bg-primary text-[14px] font-bold text-on-primary">M</div>
+          <img src="/logo.svg" alt="" className="size-8" />
           <span className="text-[16px] font-bold leading-6 tracking-[0.4px] text-ink">Melodi</span>
           <button
             type="button"
