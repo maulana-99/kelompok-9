@@ -1,6 +1,7 @@
 package router
 
 import (
+	"backend/internal/config"
 	"backend/internal/handler"
 	"backend/internal/middleware"
 	"backend/internal/repository"
@@ -10,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func New(db *gorm.DB) *gin.Engine {
+func New(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.Logger())
@@ -22,7 +23,8 @@ func New(db *gorm.DB) *gin.Engine {
 	userService := service.NewUserService(userRepo)
 	userHandler := handler.NewUserHandler(userService)
 	sessionRepo := repository.NewSessionRepository(db)
-	authService := service.NewAuthService(userRepo, sessionRepo)
+	jwtService := service.NewJWTService(cfg.JWT.Secret, cfg.JWT.ExpiresHours)
+	authService := service.NewAuthService(userRepo, sessionRepo, jwtService)
 	authHandler := handler.NewAuthHandler(authService)
 	requireAuth := middleware.Auth(authService)
 

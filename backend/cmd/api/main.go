@@ -33,7 +33,7 @@ func main() {
 		log.Fatalf("fatal: gagal migrate database: %v", err)
 	}
 
-	r := router.New(db)
+	r := router.New(db, cfg)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
