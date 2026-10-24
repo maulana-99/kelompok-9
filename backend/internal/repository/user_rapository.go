@@ -65,8 +65,10 @@ func (r *userRepository) FindByUsername(username string) (*model.User, error) {
 	return &user, nil
 }
 
+// Update writes only the profile columns. Never Save() the whole row: role is a
+// privilege column and a stale read would undo a grant/revoke made meanwhile.
 func (r *userRepository) Update(user *model.User) error {
-	return r.db.Save(user).Error
+	return r.db.Model(user).Select("name", "username", "password").Updates(user).Error
 }
 
 func (r *userRepository) Delete(id int) error {

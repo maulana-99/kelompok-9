@@ -55,6 +55,7 @@ func (s *userService) CreateUser(req model.CreateUserRequest) (*model.User, erro
 		Name:     req.Name,
 		Username: req.Username,
 		Password: hash,
+		Role:     model.RoleUser,
 	}
 	if err := s.repo.Create(user); err != nil {
 		return nil, err
