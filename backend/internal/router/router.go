@@ -27,6 +27,7 @@ func New(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	authService := service.NewAuthService(userRepo, sessionRepo, jwtService)
 	authHandler := handler.NewAuthHandler(authService)
 	requireAuth := middleware.Auth(authService)
+	optionalAuth := middleware.OptionalAuth(authService)
 
 	playlistRepo := repository.NewPlaylistRepository(db)
 	playlistSongRepo := repository.NewPlaylistSongRepository(db)
@@ -51,7 +52,8 @@ func New(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		{
 			users.POST("", userHandler.Create)
 			users.GET("", userHandler.GetAll)
-			users.GET("/:id", userHandler.GetByID)
+			// optionalAuth: is_following diisi saat peminta membawa token valid.
+			users.GET("/:id", optionalAuth, userHandler.GetByID)
 
 			// Extra followers & following endpoints
 			users.GET("/:id/followers", userHandler.GetFollowers)

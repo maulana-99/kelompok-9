@@ -3,16 +3,17 @@ import type {
   MusicGenre,
   MusicGenreDetail,
   MusicPlaylistDetail,
+  MusicSearchPage,
+  MusicSearchResult,
   MixTrack,
   MusicLyrics,
-  MusicSearchResult,
   Recommendations,
 } from '../types';
 
-// GET /music/search — public, no auth needed
-export async function searchMusic(query: string, limit = 20): Promise<MusicSearchResult[]> {
-  const params = new URLSearchParams({ q: query, limit: String(limit) });
-  return api<MusicSearchResult[]>(`/music/search?${params.toString()}`);
+// GET /music/search — public, no auth needed. Default 50 lagu per halaman.
+export async function searchMusic(query: string, page = 1, limit = 50): Promise<MusicSearchPage> {
+  const params = new URLSearchParams({ q: query, page: String(page), limit: String(limit) });
+  return api<MusicSearchPage>(`/music/search?${params.toString()}`);
 }
 
 // Stream audio for one track

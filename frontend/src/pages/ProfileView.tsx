@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { User as UserIcon, Pencil } from 'lucide-react';
+import LoadMore from '../components/LoadMore';
 import UserCard from '../components/UserCard';
 import PlaylistCard from '../components/PlaylistCard';
 import { useAuth } from '../context/AuthContext';
@@ -8,7 +9,7 @@ import { usePlayer } from '../context/PlayerContext';
 import { fetchPlaylists, fetchPlaylistDetail, toPlaylist } from '../lib/playlists';
 import { followUser, getFollowers, getFollowing, getUser, unfollowUser, updateUser } from '../lib/users';
 import { cx, initialsOf } from '../lib/utils';
-import type { BackendUser, Playlist } from '../types';
+import type { BackendUser, Playlist, UserDetail } from '../types';
 
 type ListTab = 'followers' | 'following';
 
@@ -21,9 +22,15 @@ export default function ProfileView() {
   const profileId = Number(userId);
   const validId = Number.isInteger(profileId) && profileId > 0;
 
-  const [profile, setProfile] = useState<BackendUser | null>(null);
+  const [profile, setProfile] = useState<UserDetail | null>(null);
   const [followers, setFollowers] = useState<BackendUser[]>([]);
+  const [followersTotal, setFollowersTotal] = useState(0);
+  const [followersHasMore, setFollowersHasMore] = useState(false);
   const [following, setFollowing] = useState<BackendUser[]>([]);
+  const [followingTotal, setFollowingTotal] = useState(0);
+  const [followingHasMore, setFollowingHasMore] = useState(false);
+  const [listNextPage, setListNextPage] = useState({ followers: 2, following: 2 });
+  const [listPending, setListPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -40,7 +47,9 @@ export default function ProfileView() {
   const [editSuccess, setEditSuccess] = useState('');
 
   const isOwn = me != null && profile != null && me.id === profile.id;
-  const isFollowing = me != null && followers.some((f) => f.id === me.id);
+  // Follow state dari backend (daftar follower sekarang dipaginasi, jadi tidak
+  // bisa lagi dihitung dari followers.some).
+  const isFollowing = profile?.is_following === true;
 
   const load = useCallback(async () => {
     if (!validId) {
@@ -53,24 +62,58 @@ export default function ProfileView() {
     setFollowError('');
     try {
       const [u, fers, fing] = await Promise.all([
-        getUser(profileId),
+        getUser(profileId, token),
         getFollowers(profileId),
         getFollowing(profileId),
       ]);
       setProfile(u);
-      setFollowers(fers);
-      setFollowing(fing);
+      setFollowers(fers.items);
+      setFollowersTotal(fers.total);
+      setFollowersHasMore(fers.has_more);
+      setFollowing(fing.items);
+      setFollowingTotal(fing.total);
+      setFollowingHasMore(fing.has_more);
+      setListNextPage({ followers: 2, following: 2 });
     } catch (cause) {
       setProfile(null);
       setError(cause instanceof Error ? cause.message : 'Gagal memuat profil.');
     } finally {
       setLoading(false);
     }
-  }, [profileId, validId]);
+  }, [profileId, validId, token]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Muat halaman berikutnya dari tab follower/following yang sedang aktif.
+  const loadMoreList = async () => {
+    if (!validId || listPending) return;
+    const isFollowersTab = listTab === 'followers';
+    if (isFollowersTab ? !followersHasMore : !followingHasMore) return;
+    setListPending(true);
+    try {
+      const page = isFollowersTab
+        ? await getFollowers(profileId, listNextPage.followers)
+        : await getFollowing(profileId, listNextPage.following);
+      if (isFollowersTab) {
+        setFollowers((prev) => [...prev, ...page.items]);
+        setFollowersHasMore(page.has_more);
+      } else {
+        setFollowing((prev) => [...prev, ...page.items]);
+        setFollowingHasMore(page.has_more);
+      }
+      setListNextPage((prev) =>
+        isFollowersTab
+          ? { ...prev, followers: page.page + 1 }
+          : { ...prev, following: page.page + 1 },
+      );
+    } catch (cause) {
+      setFollowError(cause instanceof Error ? cause.message : 'Gagal memuat lebih banyak.');
+    } finally {
+      setListPending(false);
+    }
+  };
 
   // ---- Playlist publik milik profil yang sedang dilihat (GET /playlists?user_id=) ----
   // Di-tag owner-nya agar hasil profil sebelumnya tidak kedapatan saat ganti halaman.
@@ -128,10 +171,13 @@ export default function ProfileView() {
       if (isFollowing) {
         await unfollowUser(profile.id, token);
         setFollowers((list) => list.filter((f) => f.id !== me.id));
+        setFollowersTotal((n) => Math.max(0, n - 1));
       } else {
         await followUser(profile.id, token);
         setFollowers((list) => [...list, me]);
+        setFollowersTotal((n) => n + 1);
       }
+      setProfile((prev) => (prev ? { ...prev, is_following: !isFollowing } : prev));
     } catch (cause) {
       setFollowError(cause instanceof Error ? cause.message : 'Gagal memperbarui follow.');
     } finally {
@@ -191,6 +237,7 @@ export default function ProfileView() {
   }
 
   const list = listTab === 'followers' ? followers : following;
+  const listHasMore = listTab === 'followers' ? followersHasMore : followingHasMore;
   // Milik sendiri: dari state PlayerContext (sudah termasuk privat).
   // Orang lain: hasil fetch playlist publik di atas (di-tag owner agar tidak basi).
   const ownPlaylists = isOwn
@@ -228,7 +275,7 @@ export default function ProfileView() {
                 onClick={() => setListTab('followers')}
                 className={cx('font-medium hover:text-primary', listTab === 'followers' ? 'text-ink' : 'text-muted')}
               >
-                {followers.length} followers
+                {followersTotal} followers
               </button>
               <span className="text-muted">•</span>
               <button
@@ -236,7 +283,7 @@ export default function ProfileView() {
                 onClick={() => setListTab('following')}
                 className={cx('font-medium hover:text-primary', listTab === 'following' ? 'text-ink' : 'text-muted')}
               >
-                {following.length} following
+                {followingTotal} following
               </button>
             </div>
 
@@ -347,7 +394,7 @@ export default function ProfileView() {
                   : 'border border-line/60 bg-card text-dim hover:border-primary/50 hover:text-ink',
               )}
             >
-              {key} ({key === 'followers' ? followers.length : following.length})
+              {key} ({key === 'followers' ? followersTotal : followingTotal})
             </button>
           ))}
         </div>
@@ -356,11 +403,14 @@ export default function ProfileView() {
             {listTab === 'followers' ? 'Belum ada follower.' : 'Belum mengikuti siapa pun.'}
           </p>
         ) : (
-          <div className="flex flex-col gap-2">
-            {list.map((u) => (
-              <UserCard key={u.id} user={u} />
-            ))}
-          </div>
+          <>
+            <div className="flex flex-col gap-2">
+              {list.map((u) => (
+                <UserCard key={u.id} user={u} />
+              ))}
+            </div>
+            {listHasMore && <LoadMore pending={listPending} onClick={() => void loadMoreList()} />}
+          </>
         )}
       </section>
 

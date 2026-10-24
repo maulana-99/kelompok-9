@@ -9,19 +9,19 @@ import (
 
 type UserRepository interface {
 	Create(user *model.User) error
-	FindAll(query string) ([]model.User, error)
+	FindAll(query string, limit, offset int) ([]model.User, int64, error)
 	FindByID(id int) (*model.User, error)
 	FindByUsername(username string) (*model.User, error)
 	Update(user *model.User) error
 	Delete(id int) error
 
-	GetFollowers(userID int) ([]model.User, error)
-	GetFollowing(userID int) ([]model.User, error)
+	GetFollowers(userID int, limit, offset int) ([]model.User, int64, error)
+	GetFollowing(userID int, limit, offset int) ([]model.User, int64, error)
 
 	Follow(followerID int, followingID int) error
 	Unfollow(followerID int, followingID int) error
 	IsFollowing(followerID int, followingID int) (bool, error)
-	
+
 }
 
 type userRepository struct {
@@ -36,17 +36,27 @@ func (r *userRepository) Create(user *model.User) error {
 	return r.db.Create(user).Error
 }
 
-func (r *userRepository) FindAll(query string) ([]model.User, error) {
-	var users []model.User
-	tx := r.db.Order("id asc")
-	if query != "" {
-		pattern := "%" + escapeLike(query) + "%"
-		tx = tx.Where("name ILIKE ? OR username ILIKE ?", pattern, pattern)
+// FindAll returns one page of users (optional name/username filter) plus the
+// total match count. Ordered by id so offset paging stays stable.
+func (r *userRepository) FindAll(query string, limit, offset int) ([]model.User, int64, error) {
+	var (
+		users []model.User
+		total int64
+	)
+	filter := func(tx *gorm.DB) *gorm.DB {
+		if query != "" {
+			pattern := "%" + escapeLike(query) + "%"
+			tx = tx.Where("name ILIKE ? OR username ILIKE ?", pattern, pattern)
+		}
+		return tx
 	}
-	if err := tx.Find(&users).Error; err != nil {
-		return nil, err
+	if err := filter(r.db.Model(&model.User{})).Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
-	return users, nil
+	if err := filter(r.db.Model(&model.User{})).Order("id asc").Limit(limit).Offset(offset).Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
 }
 
 func (r *userRepository) FindByID(id int) (*model.User, error) {
@@ -73,28 +83,42 @@ func (r *userRepository) Delete(id int) error {
 	return r.db.Delete(&model.User{}, id).Error
 }
 
-func (r *userRepository) GetFollowers(userID int) ([]model.User, error) {
+// GetFollowers returns one page of users following userID plus the total.
+func (r *userRepository) GetFollowers(userID int, limit, offset int) ([]model.User, int64, error) {
+	var total int64
+	if err := r.db.Table("follow").Where("following_id = ?", userID).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	var followers []model.User
 	// Ubah "follows" menjadi "follow"
 	err := r.db.Joins("JOIN follow ON follow.follower_id = users.id").
 		Where("follow.following_id = ?", userID).
+		Order("users.id asc").
+		Limit(limit).Offset(offset).
 		Find(&followers).Error
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return followers, nil
+	return followers, total, nil
 }
 
-func (r *userRepository) GetFollowing(userID int) ([]model.User, error) {
+// GetFollowing returns one page of users userID follows plus the total.
+func (r *userRepository) GetFollowing(userID int, limit, offset int) ([]model.User, int64, error) {
+	var total int64
+	if err := r.db.Table("follow").Where("follower_id = ?", userID).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 	var following []model.User
 	// Ubah "follows" menjadi "follow"
 	err := r.db.Joins("JOIN follow ON follow.following_id = users.id").
 		Where("follow.follower_id = ?", userID).
+		Order("users.id asc").
+		Limit(limit).Offset(offset).
 		Find(&following).Error
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return following, nil
+	return following, total, nil
 }
 
 // Implementasi fungsinya

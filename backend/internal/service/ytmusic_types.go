@@ -34,6 +34,25 @@ type ytSearchSection struct {
 	} `json:"itemSectionRenderer"`
 }
 
+// ytContinuationCommand is the "load next page" token of a shelf/section list.
+type ytContinuationCommand struct {
+	NextContinuationData *struct {
+		Continuation string `json:"continuation"`
+	} `json:"nextContinuationData"`
+}
+
+type ytContinuations []ytContinuationCommand
+
+// firstContinuationToken returns the first available continuation token.
+func (cs ytContinuations) firstContinuationToken() string {
+	for _, c := range cs {
+		if c.NextContinuationData != nil && c.NextContinuationData.Continuation != "" {
+			return c.NextContinuationData.Continuation
+		}
+	}
+	return ""
+}
+
 type ytMusicShelf struct {
 	Title *struct {
 		Runs []struct {
@@ -43,6 +62,19 @@ type ytMusicShelf struct {
 	Contents []struct {
 		MusicResponsiveListItemRenderer *ytMusicListItem `json:"musicResponsiveListItemRenderer"`
 	} `json:"contents"`
+	// Continuations carries the token for the next chunk of shelf items.
+	Continuations ytContinuations `json:"continuations"`
+}
+
+// ytContinuationResponse is the reply to a search request with only a
+// "continuation" token: the sections come back inside sectionListContinuation.
+type ytContinuationResponse struct {
+	ContinuationContents *struct {
+		SectionListContinuation *struct {
+			Contents     []ytSearchSection    `json:"contents"`
+			Continuations ytContinuations      `json:"continuations"`
+		} `json:"sectionListContinuation"`
+	} `json:"continuationContents"`
 }
 
 type ytMusicListItem struct {
