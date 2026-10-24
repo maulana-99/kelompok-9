@@ -3,8 +3,6 @@ package service
 import (
 	"backend/internal/model"
 	"backend/internal/repository"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 
 	"golang.org/x/crypto/bcrypt"
@@ -25,10 +23,11 @@ type AuthService interface {
 type authService struct {
 	userRepo    repository.UserRepository
 	sessionRepo repository.SessionRepository
+	jwt         JWTService
 }
 
-func NewAuthService(userRepo repository.UserRepository, sessionRepo repository.SessionRepository) AuthService {
-	return &authService{userRepo: userRepo, sessionRepo: sessionRepo}
+func NewAuthService(userRepo repository.UserRepository, sessionRepo repository.SessionRepository, jwt JWTService) AuthService {
+	return &authService{userRepo: userRepo, sessionRepo: sessionRepo, jwt: jwt}
 }
 
 func (s *authService) Login(req model.LoginRequest) (*model.AuthResponse, error) {
@@ -49,7 +48,7 @@ func (s *authService) Login(req model.LoginRequest) (*model.AuthResponse, error)
 		return nil, err
 	}
 
-	token, err := generateToken()
+	token, err := s.jwt.GenerateToken(user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +83,13 @@ func (s *authService) GetUserByToken(token string) (*model.User, error) {
 		return nil, ErrUnauthorized
 	}
 
+	// Verifikasi tanda tangan dan masa berlaku JWT dulu.
+	userID, err := s.jwt.ParseToken(token)
+	if err != nil {
+		return nil, ErrUnauthorized
+	}
+
+	// Token yang sudah di-logout (dihapus dari session) tetap ditolak.
 	session, err := s.sessionRepo.FindByToken(token)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -91,11 +97,11 @@ func (s *authService) GetUserByToken(token string) (*model.User, error) {
 		}
 		return nil, err
 	}
-	if !session.Status {
+	if !session.Status || session.UserID != userID {
 		return nil, ErrUnauthorized
 	}
 
-	user, err := s.userRepo.FindByID(session.UserID)
+	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUnauthorized
@@ -103,12 +109,4 @@ func (s *authService) GetUserByToken(token string) (*model.User, error) {
 		return nil, err
 	}
 	return user, nil
-}
-
-func generateToken() (string, error) {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
 }
