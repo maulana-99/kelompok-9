@@ -47,6 +47,7 @@ export default function AppShell({ navLabel, children, headerRight, autoFocusSea
         id: user.id,
         name: user.name,
         username: user.username,
+        role: user.role,
         created_at: user.created_at,
       }
     : { name: '', username: '' };

@@ -58,11 +58,12 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 // GET /api/v1/auth/me (auth)
 func (h *AuthHandler) Me(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
+	user, ok := c.Get("user")
+	current, isUser := user.(*model.User)
+	if !ok || !isUser {
 		response.Error(c, http.StatusUnauthorized, "belum login", nil)
 		return
 	}
 
-	response.Success(c, http.StatusOK, "berhasil mengambil user", user)
+	response.Success(c, http.StatusOK, "berhasil mengambil user", model.NewSessionUser(current))
 }

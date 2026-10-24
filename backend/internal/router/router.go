@@ -3,6 +3,7 @@ package router
 import (
 	"backend/internal/handler"
 	"backend/internal/middleware"
+	"backend/internal/model"
 	"backend/internal/repository"
 	"backend/internal/service"
 
@@ -36,6 +37,8 @@ func New(db *gorm.DB) *gin.Engine {
 	likeRepo := repository.NewLikeRepository(db)
 	likeService := service.NewLikeService(likeRepo)
 	likeHandler := handler.NewLikeHandler(likeService)
+	adminHandler := handler.NewAdminHandler(service.NewAdminService(repository.NewAdminRepository(db)))
+
 	historyRepo := repository.NewHistoryRepository(db)
 	historyHandler := handler.NewHistoryHandler(service.NewHistoryService(historyRepo))
 
@@ -117,6 +120,13 @@ func New(db *gorm.DB) *gin.Engine {
 			history.POST("", historyHandler.Record)
 			history.GET("", historyHandler.List)
 			history.DELETE("", historyHandler.Clear)
+		}
+
+		// --- Admin (RBAC): read-only view of registered users ---
+		admin := v1.Group("/admin", requireAuth, middleware.RequireRole(model.RoleAdmin))
+		{
+			admin.GET("/users", adminHandler.ListUsers)
+			admin.GET("/stats", adminHandler.Stats)
 		}
 
 		// Personal mixes built from history + playlists (see recommendation_service.go)
