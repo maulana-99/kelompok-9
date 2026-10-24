@@ -238,7 +238,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           ? 'library'
           : pathname === '/liked-songs'
             ? 'liked-songs'
-            : 'home';
+            : pathname === '/admin'
+              ? 'admin'
+              : 'home';
   const activePlaylistId = pathname.startsWith('/playlist/') ? pathname.replace('/playlist/', '') : null;
 
   // ---- Audio: muat ulang saat lagu berganti ----
@@ -450,6 +452,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       navigate('/search');
     } else if (target === 'library') {
       navigate('/library');
+    } else if (target === 'admin') {
+      navigate('/admin');
     } else {
       navigate('/liked-songs');
     }

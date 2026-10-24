@@ -1,4 +1,4 @@
-import { Home, Search, Library, Heart, Plus, Settings, LogOut, User, X } from 'lucide-react';
+import { Home, Search, Library, Heart, Plus, Settings, LogOut, ShieldCheck, User, X } from 'lucide-react';
 import { cx } from '../lib/utils';
 import { usePlayer } from '../context/PlayerContext';
 import PlaylistCover from './PlaylistCover';
@@ -44,6 +44,8 @@ export default function Sidebar({
     { key: 'search', label: 'Search', icon: Search, target: 'search' },
     { key: 'library', label: 'Your Library', icon: Library, target: 'library' },
     { key: 'liked-songs', label: 'Liked Songs', icon: Heart, target: 'liked-songs' },
+    // Hanya tampilan: akses tetap dijaga backend (403 untuk non-admin).
+    ...(user.role === 'admin' ? [{ key: 'admin', label: 'Admin', icon: ShieldCheck, target: 'admin' } as const] : []),
   ] as const;
 
   return (
