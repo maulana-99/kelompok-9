@@ -40,9 +40,14 @@ func (h *UserHandler) Create(c *gin.Context) {
 	response.Success(c, http.StatusCreated, "user berhasil dibuat", user)
 }
 
-// GET /api/v1/users?q=<nama atau username>
+// GET /api/v1/users?q=<nama atau username>&page=&limit=
 func (h *UserHandler) GetAll(c *gin.Context) {
-	users, err := h.service.GetAllUsers(c.Query("q"))
+	page, limit, ok := parsePageLimit(c, 20, 100)
+	if !ok {
+		return
+	}
+
+	users, err := h.service.GetAllUsers(c.Query("q"), page, limit)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "gagal mengambil data user", nil)
 		return
@@ -51,7 +56,7 @@ func (h *UserHandler) GetAll(c *gin.Context) {
 	response.Success(c, http.StatusOK, "berhasil mengambil data user", users)
 }
 
-// GET /api/v1/users/:id
+// GET /api/v1/users/:id (optional auth — is_following diisi saat peminta login)
 func (h *UserHandler) GetByID(c *gin.Context) {
 	id, err := parseID(c)
 	if err != nil {
@@ -59,7 +64,7 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.GetUserByID(id)
+	user, err := h.service.GetUserByID(id, c.GetInt("userID"))
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			response.Error(c, http.StatusNotFound, "user tidak ditemukan", nil)
@@ -121,7 +126,7 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	response.Success(c, http.StatusOK, "user berhasil dihapus", nil)
 }
 
-// GET /api/v1/users/:id/followers
+// GET /api/v1/users/:id/followers?page=&limit=
 func (h *UserHandler) GetFollowers(c *gin.Context) {
 	id, err := parseID(c)
 	if err != nil {
@@ -129,7 +134,12 @@ func (h *UserHandler) GetFollowers(c *gin.Context) {
 		return
 	}
 
-	followers, err := h.service.GetFollowers(id)
+	page, limit, ok := parsePageLimit(c, 20, 100)
+	if !ok {
+		return
+	}
+
+	followers, err := h.service.GetFollowers(id, page, limit)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			response.Error(c, http.StatusNotFound, err.Error(), nil)
@@ -142,7 +152,7 @@ func (h *UserHandler) GetFollowers(c *gin.Context) {
 	response.Success(c, http.StatusOK, "berhasil mengambil daftar follower", followers)
 }
 
-// GET /api/v1/users/:id/following
+// GET /api/v1/users/:id/following?page=&limit=
 func (h *UserHandler) GetFollowing(c *gin.Context) {
 	id, err := parseID(c)
 	if err != nil {
@@ -150,7 +160,12 @@ func (h *UserHandler) GetFollowing(c *gin.Context) {
 		return
 	}
 
-	following, err := h.service.GetFollowing(id)
+	page, limit, ok := parsePageLimit(c, 20, 100)
+	if !ok {
+		return
+	}
+
+	following, err := h.service.GetFollowing(id, page, limit)
 	if err != nil {
 		if errors.Is(err, service.ErrNotFound) {
 			response.Error(c, http.StatusNotFound, err.Error(), nil)

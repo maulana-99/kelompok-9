@@ -26,6 +26,21 @@ func Auth(authService service.AuthService) gin.HandlerFunc {
 	}
 }
 
+// OptionalAuth fills "userID"/"user" when a valid Bearer token is present but
+// never rejects the request — for public endpoints personalized per viewer
+// (e.g. is_following on GET /users/:id).
+func OptionalAuth(authService service.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if token := TokenFromHeader(c); token != "" {
+			if user, err := authService.GetUserByToken(token); err == nil {
+				c.Set("userID", user.ID)
+				c.Set("user", user)
+			}
+		}
+		c.Next()
+	}
+}
+
 // TokenFromHeader returns the Bearer token, or "" if the header is missing or malformed.
 func TokenFromHeader(c *gin.Context) string {
 	header := c.GetHeader("Authorization")

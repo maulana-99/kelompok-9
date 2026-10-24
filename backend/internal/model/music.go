@@ -15,6 +15,15 @@ type MusicResult struct {
 	Duration  string `json:"duration"`
 }
 
+// MusicSearchPage adalah respons paginated GET /api/v1/music/search.
+// YouTube Music tidak menyediakan jumlah total hasil, jadi hanya ada has_more.
+type MusicSearchPage struct {
+	Items   []MusicResult `json:"items"`
+	Page    int           `json:"page"`
+	Limit   int           `json:"limit"`
+	HasMore bool          `json:"has_more"`
+}
+
 // MusicGenre adalah kategori jelajah YouTube Music (genre atau mood).
 // ID adalah "params" browse milik YouTube, dipakai di GET /music/genres/:genreId.
 type MusicGenre struct {

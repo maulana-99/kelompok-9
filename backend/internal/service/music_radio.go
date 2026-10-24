@@ -237,7 +237,7 @@ func (s *musicService) ArtistSongs(ctx context.Context, artist string) ([]model.
 	}
 	key := strings.ToLower(name)
 	return cachedBrowse(ctx, s, "artist:"+key, artistCacheTTL, func(ctx context.Context) ([]model.MusicResult, error) {
-		results, err := s.Search(ctx, name, 40)
+		results, err := s.searchTop(ctx, name, 40)
 		if err != nil {
 			return nil, err
 		}

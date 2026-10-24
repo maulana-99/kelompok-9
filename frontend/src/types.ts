@@ -17,6 +17,27 @@ export interface BackendUser {
   created_at: string;
 }
 
+/** GET /users/:id — is_following hanya ada saat peminta login. */
+export type UserDetail = BackendUser & { is_following?: boolean };
+
+/** Respons paginated berbasis database (users, followers, following). */
+export interface Paged<T> {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+  total_pages: number;
+  has_more: boolean;
+}
+
+/** GET /music/search — tanpa total karena YouTube Music tidak menyediakannya. */
+export interface MusicSearchPage {
+  items: MusicSearchResult[];
+  page: number;
+  limit: number;
+  has_more: boolean;
+}
+
 export interface LoginRequest {
   username: string;
   password: string;
