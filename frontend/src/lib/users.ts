@@ -1,22 +1,30 @@
 import { api } from './api';
-import type { BackendUser } from '../types';
+import type { BackendUser, Paged, UserDetail } from '../types';
 
-// GET /users?q= — public, searches name/username via ILIKE on backend.
-export async function searchUsers(query: string, token?: string | null): Promise<BackendUser[]> {
-  const params = new URLSearchParams({ q: query });
-  return api<BackendUser[]>(`/users?${params.toString()}`, { token: token ?? undefined });
+// GET /users?q=&page=&limit= — public, searches name/username via ILIKE on backend.
+export async function searchUsers(
+  query: string,
+  token?: string | null,
+  page = 1,
+  limit = 20,
+): Promise<Paged<BackendUser>> {
+  const params = new URLSearchParams({ q: query, page: String(page), limit: String(limit) });
+  return api<Paged<BackendUser>>(`/users?${params.toString()}`, { token: token ?? undefined });
 }
 
-export async function getUser(id: number | string): Promise<BackendUser> {
-  return api<BackendUser>(`/users/${id}`);
+// GET /users/:id — token opsional: balasan memuat is_following saat login.
+export async function getUser(id: number | string, token?: string | null): Promise<UserDetail> {
+  return api<UserDetail>(`/users/${id}`, { token: token ?? undefined });
 }
 
-export async function getFollowers(id: number | string): Promise<BackendUser[]> {
-  return api<BackendUser[]>(`/users/${id}/followers`);
+// GET /users/:id/followers?page=&limit=
+export async function getFollowers(id: number | string, page = 1, limit = 20): Promise<Paged<BackendUser>> {
+  return api<Paged<BackendUser>>(`/users/${id}/followers?page=${page}&limit=${limit}`);
 }
 
-export async function getFollowing(id: number | string): Promise<BackendUser[]> {
-  return api<BackendUser[]>(`/users/${id}/following`);
+// GET /users/:id/following?page=&limit=
+export async function getFollowing(id: number | string, page = 1, limit = 20): Promise<Paged<BackendUser>> {
+  return api<Paged<BackendUser>>(`/users/${id}/following?page=${page}&limit=${limit}`);
 }
 
 // POST /users/:id/follow — requires auth token.

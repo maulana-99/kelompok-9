@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"backend/internal/response"
@@ -25,7 +24,7 @@ func NewMusicHandler(s service.MusicService) *MusicHandler {
 	return &MusicHandler{service: s}
 }
 
-// GET /api/v1/music/search?q=&limit=
+// GET /api/v1/music/search?q=&page=&limit=
 func (h *MusicHandler) Search(c *gin.Context) {
 	query := strings.TrimSpace(c.Query("q"))
 	if query == "" {
@@ -33,17 +32,12 @@ func (h *MusicHandler) Search(c *gin.Context) {
 		return
 	}
 
-	limit := 20
-	if limitParam := c.Query("limit"); limitParam != "" {
-		parsed, err := strconv.Atoi(limitParam)
-		if err != nil || parsed <= 0 {
-			response.Error(c, http.StatusBadRequest, "parameter limit harus angka positif", nil)
-			return
-		}
-		limit = parsed
+	page, limit, ok := parsePageLimit(c, 50, 100)
+	if !ok {
+		return
 	}
 
-	results, err := h.service.Search(c.Request.Context(), query, limit)
+	results, err := h.service.Search(c.Request.Context(), query, page, limit)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "gagal mencari lagu", err.Error())
 		return

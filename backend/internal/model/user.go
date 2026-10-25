@@ -27,6 +27,16 @@ type UserResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// UserDetailResponse adalah respons GET /users/:id. IsFollowing hanya diisi
+// saat peminta login (nil = pengunjung anonim).
+type UserDetailResponse struct {
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	Username  string    `json:"username"`
+	CreatedAt time.Time `json:"created_at"`
+	IsFollowing *bool   `json:"is_following,omitempty"`
+}
+
 type UpdateUserRequest struct {
 	Name     string `json:"name" binding:"omitempty,min=2,max=100"`
 	Username string `json:"username" binding:"omitempty,min=3,max=50,alphanum"`

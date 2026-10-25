@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { SearchX } from 'lucide-react';
 import EmptyState from '../components/EmptyState';
 import GenreSections from '../components/GenreSections';
+import LoadMore from '../components/LoadMore';
 import PageHeader from '../components/PageHeader';
 import SearchSongsTable from '../components/SearchSongsTable';
 import UserCard from '../components/UserCard';
@@ -32,7 +33,11 @@ const TABS: Array<{ key: SearchTab; label: string }> = [
 interface SearchStore {
   q: string;
   tracks: Track[];
+  songsHasMore: boolean;
+  songsNextPage: number;
   people: BackendUser[];
+  peopleHasMore: boolean;
+  peopleNextPage: number;
   musicError: string;
   peopleError: string;
   searched: boolean;
@@ -43,11 +48,16 @@ export default function SearchView() {
   const { query, currentTrackId, isPlaying, likedIds, playMix, toggleLike, rememberTracks } = usePlayer();
   const { token } = useAuth();
   const [tab, setTab] = useState<SearchTab>('all');
+  const [morePending, setMorePending] = useState<'songs' | 'people' | null>(null);
 
   const [store, setStore] = useState<SearchStore>({
     q: '',
     tracks: [],
+    songsHasMore: false,
+    songsNextPage: 2,
     people: [],
+    peopleHasMore: false,
+    peopleNextPage: 2,
     musicError: '',
     peopleError: '',
     searched: false,
@@ -59,6 +69,8 @@ export default function SearchView() {
   const matchesCurrent = store.q === trimmed;
   const songResults = matchesCurrent ? store.tracks : [];
   const peopleResults = matchesCurrent ? store.people : [];
+  const songsHasMore = matchesCurrent && store.songsHasMore;
+  const peopleHasMore = matchesCurrent && store.peopleHasMore;
   const musicError = matchesCurrent ? store.musicError : '';
   const peopleError = matchesCurrent ? store.peopleError : '';
   const searched = matchesCurrent && store.searched;
@@ -70,14 +82,16 @@ export default function SearchView() {
     let active = true;
     const timer = window.setTimeout(async () => {
       const [musicSettled, peopleSettled] = await Promise.allSettled([
-        searchMusic(trimmed, 20).then((r) => r.map(toTrack)),
+        searchMusic(trimmed),
         searchUsers(trimmed, token),
       ]);
 
       if (!active) return;
 
-      const tracks = musicSettled.status === 'fulfilled' ? musicSettled.value : [];
-      const people = peopleSettled.status === 'fulfilled' ? peopleSettled.value : [];
+      const musicPage = musicSettled.status === 'fulfilled' ? musicSettled.value : null;
+      const peoplePage = peopleSettled.status === 'fulfilled' ? peopleSettled.value : null;
+      const tracks = musicPage ? musicPage.items.map(toTrack) : [];
+      const people = peoplePage ? peoplePage.items : [];
       const musicError =
         musicSettled.status === 'rejected'
           ? musicSettled.reason instanceof Error
@@ -91,7 +105,18 @@ export default function SearchView() {
             : 'Unable to search people.'
           : '';
 
-      setStore({ q: trimmed, tracks, people, musicError, peopleError, searched: true });
+      setStore({
+        q: trimmed,
+        tracks,
+        songsHasMore: musicPage?.has_more ?? false,
+        songsNextPage: 2,
+        people,
+        peopleHasMore: peoplePage?.has_more ?? false,
+        peopleNextPage: 2,
+        musicError,
+        peopleError,
+        searched: true,
+      });
       if (tracks.length) rememberTracks(tracks);
     }, 250);
 
@@ -100,6 +125,53 @@ export default function SearchView() {
       window.clearTimeout(timer);
     };
   }, [trimmed, rememberTracks, token]);
+
+  // "Muat lebih banyak" hanya berlaku untuk query yang hasilnya sedang tampil.
+  const canLoadMore = store.q === trimmed;
+
+  const loadMoreSongs = async () => {
+    if (!canLoadMore || !store.songsHasMore || morePending) return;
+    setMorePending('songs');
+    try {
+      const page = await searchMusic(store.q, store.songsNextPage);
+      const tracks = page.items.map(toTrack);
+      setStore((prev) => ({
+        ...prev,
+        tracks: [...prev.tracks, ...tracks],
+        songsHasMore: page.has_more,
+        songsNextPage: page.page + 1,
+      }));
+      if (tracks.length) rememberTracks(tracks);
+    } catch (cause) {
+      setStore((prev) => ({
+        ...prev,
+        musicError: cause instanceof Error ? cause.message : 'Unable to load more songs.',
+      }));
+    } finally {
+      setMorePending(null);
+    }
+  };
+
+  const loadMorePeople = async () => {
+    if (!canLoadMore || !store.peopleHasMore || morePending) return;
+    setMorePending('people');
+    try {
+      const page = await searchUsers(store.q, token, store.peopleNextPage);
+      setStore((prev) => ({
+        ...prev,
+        people: [...prev.people, ...page.items],
+        peopleHasMore: page.has_more,
+        peopleNextPage: page.page + 1,
+      }));
+    } catch (cause) {
+      setStore((prev) => ({
+        ...prev,
+        peopleError: cause instanceof Error ? cause.message : 'Unable to load more people.',
+      }));
+    } finally {
+      setMorePending(null);
+    }
+  };
 
   const showMusic = tab === 'all' || tab === 'music';
   const showPeople = tab === 'all' || tab === 'people';
@@ -189,6 +261,9 @@ export default function SearchView() {
             onPlay={playMix}
             onToggleLike={toggleLike}
           />
+          {tab === 'music' && songResults.length > 0 && songsHasMore && (
+            <LoadMore pending={morePending === 'songs'} onClick={() => void loadMoreSongs()} />
+          )}
         </section>
       )}
 
@@ -214,6 +289,9 @@ export default function SearchView() {
               <UserCard key={person.id} user={person} />
             ))}
           </div>
+          {tab === 'people' && peopleResults.length > 0 && peopleHasMore && (
+            <LoadMore pending={morePending === 'people'} onClick={() => void loadMorePeople()} />
+          )}
         </section>
       )}
 

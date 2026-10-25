@@ -58,11 +58,21 @@ const (
 	infoTimeout = 15 * time.Second
 	// Max parallel innertube calls inside GetInfos.
 	infoWorkers = 5
+
+	// Default page size of GET /music/search (paginated).
+	defaultSearchLimit = 50
+	// How long a query's accumulated search results stay cached; page 2+
+	// is served from the cache plus continuation fetches.
+	searchCacheTTL = 10 * time.Minute
+	// Max continuation calls per request when extending cached results.
+	maxSearchContinuations = 10
+	// Max distinct queries kept in the search cache.
+	maxSearchCacheEntries = 50
 )
 
 type MusicService interface {
-	// Search for songs on YouTube Music based on input query.
-	Search(ctx context.Context, query string, limit int) ([]model.MusicResult, error)
+	// Search for songs on YouTube Music based on input query, page-based.
+	Search(ctx context.Context, query string, page, limit int) (*model.MusicSearchPage, error)
 	// GetInfo returns track metadata (title, artist, thumbnail, duration) for one video ID.
 	GetInfo(ctx context.Context, videoID string) (model.MusicResult, error)
 	// GetInfos returns track metadata for many video IDs, preserving input order.
@@ -104,6 +114,20 @@ type musicService struct {
 	browseCache map[string]browseEntry
 	// Cache track metadata so /music/info doesn't hit innertube for every request.
 	infos map[string]infoEntry
+	// Cache the accumulated search results per query so page 2+ doesn't
+	// refetch page 1 (YouTube Music only offers continuation tokens).
+	searchMu    sync.Mutex
+	searchCache map[string]*searchState
+}
+
+// searchState is the append-only result list of one query plus the
+// continuation token of the songs shelf for fetching the next chunk.
+type searchState struct {
+	mu        sync.Mutex
+	items     []model.MusicResult
+	seen      map[string]bool
+	songToken string
+	expiry    time.Time
 }
 
 type streamEntry struct {
@@ -139,6 +163,7 @@ func NewMusicService() MusicService {
 		streams:      make(map[string]streamEntry),
 		browseCache:  make(map[string]browseEntry),
 		infos:        make(map[string]infoEntry),
+		searchCache:  make(map[string]*searchState),
 	}
 }
 
@@ -168,18 +193,118 @@ type ytItem struct {
 	typ  string
 }
 
-func (s *musicService) Search(ctx context.Context, query string, limit int) ([]model.MusicResult, error) {
+func (s *musicService) Search(ctx context.Context, query string, page, limit int) (*model.MusicSearchPage, error) {
+	if page <= 0 {
+		page = 1
+	}
 	if limit <= 0 {
-		limit = 20
+		limit = defaultSearchLimit
 	}
 
-	// Two searches run in parallel:
-	//  - "Songs" filter : dense song results, complete metadata
-	//  - "Videos" filter: music videos (covers, remixes, MVs) that don't appear in the songs shelf, filtered so non-music results never came in.
+	// Halaman 2+ melewati gabungan awal; bangun halaman 1 dengan ukuran
+	// default agar hasilnya konsisten antar permintaan.
+	pageOneLimit := limit
+	if page > 1 {
+		pageOneLimit = defaultSearchLimit
+	}
+
+	st, err := s.getSearchState(ctx, query, pageOneLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	offset := (page - 1) * limit
+	// +1 item: mengisi has_more secara pasti tanpa halaman kosong.
+	s.extendSearch(ctx, st, offset+limit+1)
+
+	items, hasMore := st.window(offset, limit)
+	return &model.MusicSearchPage{
+		Items:   items,
+		Page:    page,
+		Limit:   limit,
+		HasMore: hasMore,
+	}, nil
+}
+
+// searchTop returns the top-`limit` merged results (page-one semantics) for
+// internal callers such as ArtistSongs, sharing the query cache with Search.
+func (s *musicService) searchTop(ctx context.Context, query string, limit int) ([]model.MusicResult, error) {
+	st, err := s.getSearchState(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	s.extendSearch(ctx, st, limit)
+	items, _ := st.window(0, limit)
+	return items, nil
+}
+
+// window returns items[offset:offset+limit] (copy) and whether more exist.
+func (st *searchState) window(offset, limit int) ([]model.MusicResult, bool) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	start := min(offset, len(st.items))
+	end := min(offset+limit, len(st.items))
+	items := make([]model.MusicResult, end-start)
+	copy(items, st.items[start:end])
+	return items, len(st.items) > offset+limit
+}
+
+// getSearchState returns the cached state for a query (refreshing its TTL),
+// or builds it from two fresh parallel searches.
+func (s *musicService) getSearchState(ctx context.Context, query string, pageOneLimit int) (*searchState, error) {
+	now := time.Now()
+
+	s.searchMu.Lock()
+	for key, old := range s.searchCache {
+		if expiredAt(old, now) {
+			delete(s.searchCache, key)
+		}
+	}
+	if st, ok := s.searchCache[query]; ok {
+		st.mu.Lock()
+		st.expiry = now.Add(searchCacheTTL)
+		st.mu.Unlock()
+		s.searchMu.Unlock()
+		return st, nil
+	}
+	s.searchMu.Unlock()
+
+	st, err := s.buildSearchState(ctx, query, pageOneLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	s.searchMu.Lock()
+	if len(s.searchCache) >= maxSearchCacheEntries {
+		for key, old := range s.searchCache {
+			if expiredAt(old, now) {
+				delete(s.searchCache, key)
+			}
+		}
+		for key := range s.searchCache {
+			if len(s.searchCache) < maxSearchCacheEntries {
+				break
+			}
+			delete(s.searchCache, key)
+		}
+	}
+	s.searchCache[query] = st
+	s.searchMu.Unlock()
+	return st, nil
+}
+
+// buildSearchState runs the initial search:
+//  - "Songs" filter : dense song results, complete metadata
+//  - "Videos" filter: music videos (covers, remixes, MVs) that don't appear in the songs shelf, filtered so non-music results never came in.
+//
+// Merge: songs shelf results first (most relevant), reserving a few slots for
+// music videos so they still show up instead of drowning in the song list.
+func (s *musicService) buildSearchState(ctx context.Context, query string, pageOneLimit int) (*searchState, error) {
 	var (
 		wg         sync.WaitGroup
 		songItems  []ytItem
 		videoItems []ytItem
+		songToken  string
 		songErr    error
 		videoErr   error
 	)
@@ -193,6 +318,7 @@ func (s *musicService) Search(ctx context.Context, query string, limit int) ([]m
 			return
 		}
 		songItems = s.collectItems(parsed)
+		songToken = searchContinuationToken(parsed)
 	}()
 	go func() {
 		defer wg.Done()
@@ -210,33 +336,67 @@ func (s *musicService) Search(ctx context.Context, query string, limit int) ([]m
 		return nil, songErr
 	}
 
-	// Merge: songs shelf results first (most relevant), reserving a few slots for
-	// music videos (covers/remixes/MVs) so they still show up instead of
-	// drowning in the song list.
-	songCap := limit - min(5, limit/4)
-	seen := make(map[string]bool)
-	results := make([]model.MusicResult, 0, limit)
+	st := &searchState{
+		seen:      make(map[string]bool),
+		songToken: songToken,
+		expiry:    time.Now().Add(searchCacheTTL),
+	}
+	songCap := pageOneLimit - min(5, pageOneLimit/4)
 	addAll := func(items []ytItem, cap int) {
 		for _, it := range items {
-			if len(results) >= cap {
+			if len(st.items) >= cap {
 				return
 			}
 			listItem := it.list
 			if listItem == nil || listItem.PlaylistItemData == nil || listItem.PlaylistItemData.VideoID == "" {
 				continue
 			}
-			if seen[listItem.PlaylistItemData.VideoID] {
+			if st.seen[listItem.PlaylistItemData.VideoID] {
 				continue
 			}
 			if result, ok := parseListItem(listItem, it.typ); ok {
-				seen[result.VideoID] = true
-				results = append(results, result)
+				st.seen[result.VideoID] = true
+				st.items = append(st.items, result)
 			}
 		}
 	}
 	addAll(songItems, songCap)
-	addAll(videoItems, limit)
-	return results, nil
+	addAll(videoItems, pageOneLimit)
+	return st, nil
+}
+
+// expiredAt reports whether a state's TTL has passed (reads expiry under the
+// state's own lock — it is refreshed concurrently by cache hits).
+func expiredAt(st *searchState, now time.Time) bool {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	return now.After(st.expiry)
+}
+
+// extendSearch follows the songs-shelf continuation until the state holds at
+// least `want` items or YouTube Music runs out of pages.
+func (s *musicService) extendSearch(ctx context.Context, st *searchState, want int) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	for fetched := 0; len(st.items) < want && st.songToken != "" && fetched < maxSearchContinuations; fetched++ {
+		parsed, err := s.fetchSearchContinuation(ctx, st.songToken)
+		if err != nil {
+			// Upstream hiccup: keep what we have instead of failing the page.
+			st.songToken = ""
+			return
+		}
+		for _, it := range collectSectionItems(continuationSections(parsed)) {
+			listItem := it.list
+			if listItem == nil || listItem.PlaylistItemData == nil || listItem.PlaylistItemData.VideoID == "" {
+				continue
+			}
+			if result, ok := parseListItem(listItem, it.typ); ok && !st.seen[result.VideoID] {
+				st.seen[result.VideoID] = true
+				st.items = append(st.items, result)
+			}
+		}
+		st.songToken = continuationResponseToken(parsed)
+	}
 }
 
 // fetchSearch calls the innertube search API (empty params = no filter).
@@ -250,6 +410,64 @@ func (s *musicService) fetchSearch(ctx context.Context, query, params string) (*
 		return nil, err
 	}
 	return &parsed, nil
+}
+
+// fetchSearchContinuation loads the next chunk of a search via its token.
+func (s *musicService) fetchSearchContinuation(ctx context.Context, token string) (*ytContinuationResponse, error) {
+	body := map[string]any{"continuation": token}
+	var parsed ytContinuationResponse
+	if err := s.callInnertube(ctx, ytmSearchURL, body, &parsed); err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+// searchContinuationToken reads the first shelf continuation of the initial
+// search response (the songs shelf — the only shelf we paginate).
+func searchContinuationToken(parsed *ytSearchResponse) string {
+	if parsed == nil || parsed.Contents == nil || parsed.Contents.TabbedSearchResultsRenderer == nil {
+		return ""
+	}
+	for _, tab := range parsed.Contents.TabbedSearchResultsRenderer.Tabs {
+		if tab.TabRenderer == nil || tab.TabRenderer.Content == nil || tab.TabRenderer.Content.SectionListRenderer == nil {
+			continue
+		}
+		for _, section := range tab.TabRenderer.Content.SectionListRenderer.Contents {
+			if section.MusicShelfRenderer != nil {
+				if token := section.MusicShelfRenderer.Continuations.firstContinuationToken(); token != "" {
+					return token
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// continuationSections flattens a continuation response into its sections.
+func continuationSections(parsed *ytContinuationResponse) []ytSearchSection {
+	if parsed == nil || parsed.ContinuationContents == nil || parsed.ContinuationContents.SectionListContinuation == nil {
+		return nil
+	}
+	return parsed.ContinuationContents.SectionListContinuation.Contents
+}
+
+// continuationResponseToken reads the next token of a continuation response.
+func continuationResponseToken(parsed *ytContinuationResponse) string {
+	if parsed == nil || parsed.ContinuationContents == nil || parsed.ContinuationContents.SectionListContinuation == nil {
+		return ""
+	}
+	sl := parsed.ContinuationContents.SectionListContinuation
+	if token := sl.Continuations.firstContinuationToken(); token != "" {
+		return token
+	}
+	for _, section := range sl.Contents {
+		if section.MusicShelfRenderer != nil {
+			if token := section.MusicShelfRenderer.Continuations.firstContinuationToken(); token != "" {
+				return token
+			}
+		}
+	}
+	return ""
 }
 
 // upstreamStatusError is returned by callInnertube on a non-200 response.
@@ -468,17 +686,25 @@ func (s *musicService) collectItems(parsed *ytSearchResponse) []ytItem {
 		if tab.TabRenderer == nil || tab.TabRenderer.Content == nil || tab.TabRenderer.Content.SectionListRenderer == nil {
 			continue
 		}
-		for _, section := range tab.TabRenderer.Content.SectionListRenderer.Contents {
-			switch {
-			case section.MusicShelfRenderer != nil:
-				shelfType := musicTypeLabels[shelfTitle(section.MusicShelfRenderer)]
-				for _, item := range section.MusicShelfRenderer.Contents {
-					items = append(items, ytItem{list: item.MusicResponsiveListItemRenderer, typ: shelfType})
-				}
-			case section.ItemSection != nil:
-				for _, item := range section.ItemSection.Contents {
-					items = append(items, ytItem{list: item.MusicResponsiveListItemRenderer})
-				}
+		items = append(items, collectSectionItems(tab.TabRenderer.Content.SectionListRenderer.Contents)...)
+	}
+	return items
+}
+
+// collectSectionItems gathers items from one list of search sections,
+// shared by the initial search and continuation responses.
+func collectSectionItems(sections []ytSearchSection) []ytItem {
+	var items []ytItem
+	for _, section := range sections {
+		switch {
+		case section.MusicShelfRenderer != nil:
+			shelfType := musicTypeLabels[shelfTitle(section.MusicShelfRenderer)]
+			for _, item := range section.MusicShelfRenderer.Contents {
+				items = append(items, ytItem{list: item.MusicResponsiveListItemRenderer, typ: shelfType})
+			}
+		case section.ItemSection != nil:
+			for _, item := range section.ItemSection.Contents {
+				items = append(items, ytItem{list: item.MusicResponsiveListItemRenderer})
 			}
 		}
 	}
