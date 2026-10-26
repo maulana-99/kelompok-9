@@ -1,7 +1,8 @@
-import { History, Music } from 'lucide-react';
+import { History } from 'lucide-react';
 import EmptyState from './EmptyState';
 import { cx } from '../lib/utils';
 import Equalizer from './Equalizer';
+import TrackThumb from './TrackThumb';
 import type { Track } from '../types';
 
 interface RecentTrackListProps {
@@ -52,14 +53,14 @@ export default function RecentTrackList({
               <div className="flex w-5 items-center justify-center text-[12px] font-medium leading-4 text-muted">
                 {active ? <Equalizer playing={isPlaying} /> : i + 1}
               </div>
-              <div
+              <TrackThumb
+                track={track}
                 className={cx(
-                  'flex size-10 shrink-0 items-center justify-center border bg-line shadow-sm',
+                  'size-10 bg-line shadow-sm',
                   active ? 'border-primary/40 ring-1 ring-primary/30' : 'border-line',
                 )}
-              >
-                <Music className={cx('size-[13px]', active ? 'text-primary' : 'text-muted')} />
-              </div>
+                iconClassName={cx('size-[13px]', active ? 'text-primary' : 'text-muted')}
+              />
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className={cx('truncate text-[14px] font-semibold leading-5', active ? 'text-primary-soft' : 'text-ink')}>
