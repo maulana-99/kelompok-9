@@ -37,6 +37,7 @@ export default function ServerStatusBanner() {
   }, [serverDown, internetDown]);
 
   const retry = async () => {
+    if (checking) return;
     setChecking(true);
     await pingServer();
     setChecking(false);
@@ -46,7 +47,7 @@ export default function ServerStatusBanner() {
 
   // Live region selalu ada di DOM supaya pembaca layar ikut mengumumkan perubahan.
   return (
-    <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[92px] z-[80] flex justify-center px-4">
+    <div role="status" className="pointer-events-none fixed inset-x-0 bottom-[92px] z-[80] flex justify-center px-4">
       {show && (
         <div className="pointer-events-auto flex max-w-xl items-start gap-3 border border-primary/40 bg-raised px-4 py-3 text-[13px] text-ink shadow-card">
           {internetDown ? (
@@ -66,10 +67,10 @@ export default function ServerStatusBanner() {
             <button
               type="button"
               onClick={() => void retry()}
-              disabled={checking}
-              className="flex shrink-0 items-center gap-1.5 self-center border border-line px-3 py-1.5 font-semibold text-ink hover:border-primary disabled:opacity-60"
+              aria-disabled={checking}
+              className="flex shrink-0 items-center gap-1.5 self-center border border-line px-3 py-1.5 font-semibold text-ink hover:border-primary aria-disabled:opacity-60"
             >
-              <RefreshCw aria-hidden="true" className={checking ? 'size-3.5 animate-spin' : 'size-3.5'} />
+              <RefreshCw aria-hidden="true" className={checking ? 'size-3.5 motion-safe:animate-spin' : 'size-3.5'} />
               {checking ? 'Mengecek…' : 'Coba lagi'}
             </button>
           )}

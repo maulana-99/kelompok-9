@@ -34,21 +34,28 @@ export function isServerUnreachable(status: number): boolean {
 
 // Banner "server offline" (ServerStatusBanner) mendengarkan event ini.
 export const SERVER_STATUS_EVENT = 'melodi:server-status';
+// AuthProvider mendengarkan event ini: token ditolak server (401) -> sesi dihapus.
+export const AUTH_EXPIRED_EVENT = 'melodi:auth-expired';
 function reportServer(online: boolean) {
   window.dispatchEvent(new CustomEvent(SERVER_STATUS_EVENT, { detail: online }));
 }
 
-/** GET /health tanpa envelope; dipakai banner untuk cek apakah server sudah kembali. */
-export async function pingServer(): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_URL.replace(/\/api\/v1\/?$/, '')}/health`, { cache: 'no-store' });
-    const online = res.ok;
-    reportServer(online);
-    return online;
-  } catch {
-    reportServer(false);
-    return false;
-  }
+let pinging: Promise<boolean> | null = null;
+
+/**
+ * GET /health (di root server, tanpa envelope). Satu-satunya yang boleh menyatakan server
+ * "kembali", supaya respons lama yang masih jalan tidak membuat banner berkedip.
+ */
+export function pingServer(): Promise<boolean> {
+  pinging ??= fetch(new URL('/health', API_URL), { cache: 'no-store', signal: AbortSignal.timeout(5000) })
+    .then((res) => res.ok)
+    .catch(() => false)
+    .then((online) => {
+      reportServer(online);
+      pinging = null;
+      return online;
+    });
+  return pinging;
 }
 
 interface RequestOptions {
@@ -84,7 +91,10 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     reportServer(false);
     throw new ApiError(SERVER_DOWN_MESSAGE, res.status);
   }
-  reportServer(true);
+
+  if (res.status === 401 && token) {
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+  }
 
   if (!res.ok || !payload?.success) {
     // Pesan backend sudah berbahasa Indonesia untuk kesalahan pengguna (4xx); 5xx bisa teknis.
