@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { PlayerProvider } from './context/PlayerContext';
 import AppShell from './components/AppShell';
+import ServerStatusBanner from './components/ServerStatusBanner';
 import HomeView from './pages/HomeView';
 import LibraryView from './pages/LibraryView';
 import LoginView from './pages/LoginView';
@@ -35,6 +36,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 function App() {
   return (
     <AuthProvider>
+      <ServerStatusBanner />
       <BrowserRouter>
         {/* PlayerProvider berada di atas <Routes>: <audio> tidak unmount saat pindah halaman. */}
         <PlayerProvider>
