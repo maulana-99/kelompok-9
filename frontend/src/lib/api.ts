@@ -19,6 +19,38 @@ export class ApiError extends Error {
   }
 }
 
+// Pesan untuk pengguna awam: jelaskan apa yang terjadi dan apa yang bisa dilakukan.
+export const OFFLINE_MESSAGE = 'Internet kamu sepertinya terputus. Periksa koneksi, lalu coba lagi.';
+export const SERVER_DOWN_MESSAGE =
+  'Server Melodi sedang tidak aktif. Ini biasanya sementara, coba lagi dalam beberapa menit.';
+const SERVER_ERROR_MESSAGE = 'Ada gangguan di server Melodi. Coba lagi sebentar lagi.';
+const TOO_MANY_MESSAGE = 'Terlalu banyak permintaan dalam waktu singkat. Tunggu sebentar, lalu coba lagi.';
+const UNKNOWN_MESSAGE = 'Terjadi kesalahan yang tidak terduga. Muat ulang halaman, lalu coba lagi.';
+
+/** 0 = request tidak sampai; 502/503/504 = proxy aktif tapi server di belakangnya mati. */
+export function isServerUnreachable(status: number): boolean {
+  return status === 0 || status === 502 || status === 503 || status === 504;
+}
+
+// Banner "server offline" (ServerStatusBanner) mendengarkan event ini.
+export const SERVER_STATUS_EVENT = 'melodi:server-status';
+function reportServer(online: boolean) {
+  window.dispatchEvent(new CustomEvent(SERVER_STATUS_EVENT, { detail: online }));
+}
+
+/** GET /health tanpa envelope; dipakai banner untuk cek apakah server sudah kembali. */
+export async function pingServer(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL.replace(/\/api\/v1\/?$/, '')}/health`, { cache: 'no-store' });
+    const online = res.ok;
+    reportServer(online);
+    return online;
+  } catch {
+    reportServer(false);
+    return false;
+  }
+}
+
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
@@ -26,7 +58,7 @@ interface RequestOptions {
 }
 
 // Success -> returns the contents of data from the envelope
-// Failed -> throws ApiError with the message from the backend
+// Failed -> throws ApiError with a message a non-technical user can act on
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, token } = options;
 
@@ -41,13 +73,25 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
-    throw new ApiError('Tidak bisa terhubung ke server', 0);
+    if (!navigator.onLine) throw new ApiError(OFFLINE_MESSAGE, 0);
+    reportServer(false);
+    throw new ApiError(SERVER_DOWN_MESSAGE, 0);
   }
 
   const payload = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
 
+  if (isServerUnreachable(res.status) && !payload) {
+    reportServer(false);
+    throw new ApiError(SERVER_DOWN_MESSAGE, res.status);
+  }
+  reportServer(true);
+
   if (!res.ok || !payload?.success) {
-    throw new ApiError(payload?.message ?? `Terjadi kesalahan (HTTP ${res.status})`, res.status);
+    // Pesan backend sudah berbahasa Indonesia untuk kesalahan pengguna (4xx); 5xx bisa teknis.
+    let message = payload?.message;
+    if (res.status === 429) message = TOO_MANY_MESSAGE;
+    else if (res.status >= 500) message = SERVER_ERROR_MESSAGE;
+    throw new ApiError(message || UNKNOWN_MESSAGE, res.status);
   }
 
   return payload.data as T;

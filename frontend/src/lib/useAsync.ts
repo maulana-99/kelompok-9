@@ -23,7 +23,7 @@ export function useAsync<T>(key: string, loader: () => Promise<T>): AsyncState<T
       (data) => active && setStore({ key, data, error: '' }),
       (cause: unknown) =>
         active &&
-        setStore({ key, data: null, error: cause instanceof Error ? cause.message : 'Terjadi kesalahan' }),
+        setStore({ key, data: null, error: cause instanceof Error ? cause.message : 'Terjadi kesalahan. Coba lagi.' }),
     );
     return () => {
       active = false;

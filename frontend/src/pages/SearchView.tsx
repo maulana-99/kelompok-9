@@ -96,13 +96,13 @@ export default function SearchView() {
         musicSettled.status === 'rejected'
           ? musicSettled.reason instanceof Error
             ? musicSettled.reason.message
-            : 'Unable to search songs.'
+            : 'Gagal mencari lagu. Coba lagi.'
           : '';
       const peopleError =
         peopleSettled.status === 'rejected'
           ? peopleSettled.reason instanceof Error
             ? peopleSettled.reason.message
-            : 'Unable to search people.'
+            : 'Gagal mencari orang. Coba lagi.'
           : '';
 
       setStore({
@@ -145,7 +145,7 @@ export default function SearchView() {
     } catch (cause) {
       setStore((prev) => ({
         ...prev,
-        musicError: cause instanceof Error ? cause.message : 'Unable to load more songs.',
+        musicError: cause instanceof Error ? cause.message : 'Gagal memuat lagu lainnya. Coba lagi.',
       }));
     } finally {
       setMorePending(null);
@@ -166,7 +166,7 @@ export default function SearchView() {
     } catch (cause) {
       setStore((prev) => ({
         ...prev,
-        peopleError: cause instanceof Error ? cause.message : 'Unable to load more people.',
+        peopleError: cause instanceof Error ? cause.message : 'Gagal memuat orang lainnya. Coba lagi.',
       }));
     } finally {
       setMorePending(null);

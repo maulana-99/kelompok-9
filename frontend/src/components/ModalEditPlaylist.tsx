@@ -54,7 +54,7 @@ export default function ModalEditPlaylist({
     try {
       await onSave({ title: trimmedName, description: trimmedDescription });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to save playlist.');
+      setError(cause instanceof Error ? cause.message : 'Gagal menyimpan playlist. Coba lagi.');
       setSubmitting(false);
     }
   };

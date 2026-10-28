@@ -56,7 +56,7 @@ export default function ModalCreatePlaylist({ onClose, onCreate }: ModalCreatePl
         status,
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to create playlist.');
+      setError(cause instanceof Error ? cause.message : 'Gagal membuat playlist. Coba lagi.');
       setSubmitting(false);
     }
   };

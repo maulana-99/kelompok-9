@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { api } from '../lib/api';
+import { ApiError, api, isServerUnreachable } from '../lib/api';
 
 export interface User {
   id: number;
@@ -82,8 +82,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const user = await api<User>('/auth/me', { token: stored.token });
         if (!cancelled) setSession({ token: stored.token, user });
-      } catch {
-        if (!cancelled) {
+      } catch (cause) {
+        if (cancelled) return;
+        // Server mati/jaringan putus bukan berarti sesi habis: jangan paksa login ulang.
+        if (cause instanceof ApiError && isServerUnreachable(cause.status)) {
+          setSession(stored);
+        } else {
           setSession(null);
           writeStorage(null);
         }

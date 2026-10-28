@@ -44,7 +44,7 @@ export default function LoginView({ defaultMode = 'login' }: LoginViewProps) {
       }
       navigate('/', { replace: true });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to sign in.');
+      setError(cause instanceof Error ? cause.message : 'Gagal masuk. Coba lagi.');
     } finally {
       setSubmitting(false);
     }
