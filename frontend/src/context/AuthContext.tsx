@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { ApiError, api, isServerUnreachable } from '../lib/api';
+import { AUTH_EXPIRED_EVENT, ApiError, api } from '../lib/api';
 
 export interface User {
   id: number;
@@ -84,12 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setSession({ token: stored.token, user });
       } catch (cause) {
         if (cancelled) return;
-        // Server mati/jaringan putus bukan berarti sesi habis: jangan paksa login ulang.
-        if (cause instanceof ApiError && isServerUnreachable(cause.status)) {
-          setSession(stored);
-        } else {
+        // Hanya token yang ditolak server yang berarti sesi habis. Server mati, jaringan
+        // putus, atau gangguan 5xx tidak boleh memaksa login ulang.
+        if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
           setSession(null);
           writeStorage(null);
+        } else {
+          setSession(stored);
         }
       } finally {
         if (!cancelled) setReady(true);
@@ -100,6 +101,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  // Token ditolak di tengah pemakaian (mis. kedaluwarsa saat server sempat mati) -> ke halaman login.
+  useEffect(() => {
+    const onExpired = () => {
+      setSession(null);
+      writeStorage(null);
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
