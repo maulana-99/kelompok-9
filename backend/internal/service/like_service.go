@@ -5,11 +5,8 @@ import (
 	"backend/internal/repository"
 	"errors"
 	"strings"
-
-	"gorm.io/gorm"
 )
 
-var ErrInvalidLikeMusicID = errors.New("music_id tidak boleh kosong")
 var ErrLikeNotFound = errors.New("like tidak ditemukan")
 
 type LikeService interface {
@@ -88,5 +85,3 @@ func (s *likeService) UnlikeSong(
 
 	return nil
 }
-
-var _ = gorm.ErrRecordNotFound

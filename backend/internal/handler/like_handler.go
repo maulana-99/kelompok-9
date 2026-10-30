@@ -39,7 +39,7 @@ func (h *LikeHandler) Create(c *gin.Context) {
 
 	like, err := h.likes.LikeSong(userID, req.MusicID)
 	if err != nil {
-		if errors.Is(err, service.ErrInvalidLikeMusicID) {
+		if errors.Is(err, service.ErrInvalidMusicID) {
 			response.Error(c, http.StatusBadRequest, err.Error(), nil)
 			return
 		}
@@ -89,7 +89,7 @@ func (h *LikeHandler) Delete(c *gin.Context) {
 	musicID := c.Param("musicId")
 	err := h.likes.UnlikeSong(userID, musicID)
 	if err != nil {
-		if errors.Is(err, service.ErrInvalidLikeMusicID) {
+		if errors.Is(err, service.ErrInvalidMusicID) {
 			response.Error(c, http.StatusBadRequest, err.Error(), nil)
 			return
 		}
