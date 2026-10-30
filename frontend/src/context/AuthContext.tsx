@@ -8,12 +8,15 @@ import {
   type ReactNode,
 } from 'react';
 import { AUTH_EXPIRED_EVENT, ApiError, api } from '../lib/api';
+import type { UserRole } from '../types';
 
 export interface User {
   id: number;
   name: string;
   username: string;
   created_at: string;
+  /** Hanya dikirim untuk user yang sedang login (login & /auth/me). */
+  role?: UserRole;
 }
 
 interface LoginResponse {

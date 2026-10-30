@@ -3,11 +3,29 @@ package model
 import "time"
 
 type User struct {
-	ID        int       `gorm:"primaryKey" json:"id"`
-	Name      string    `gorm:"type:varchar(100);not null" json:"name"`
-	Username  string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"username"`
-	Password  string    `gorm:"type:varchar(255);not null" json:"-"`
+	ID       int    `gorm:"primaryKey" json:"id"`
+	Name     string `gorm:"type:varchar(100);not null" json:"name"`
+	Username string `gorm:"type:varchar(50);uniqueIndex;not null" json:"username"`
+	Password string `gorm:"type:varchar(255);not null" json:"-"`
+	// Role tidak ikut di JSON User (endpoint publik /users); hanya pemilik akun
+	// yang melihatnya lewat SessionUser (login & /auth/me).
+	Role      string    `gorm:"type:varchar(20);not null;default:user" json:"-"`
 	CreatedAt time.Time `gorm:"type:timestamp;not null;default:now()" json:"created_at"`
+}
+
+const (
+	RoleUser  = "user"
+	RoleAdmin = "admin"
+)
+
+// SessionUser adalah user yang sedang login, plus role-nya (untuk menampilkan menu admin).
+type SessionUser struct {
+	*User
+	Role string `json:"role"`
+}
+
+func NewSessionUser(user *User) *SessionUser {
+	return &SessionUser{User: user, Role: user.Role}
 }
 
 func (User) TableName() string {

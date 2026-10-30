@@ -14,6 +14,7 @@ import SearchView from './pages/SearchView';
 import GenreView from './pages/GenreView';
 import ExplorePlaylistView from './pages/ExplorePlaylistView';
 import MixView from './pages/MixView';
+import AdminView from './pages/AdminView';
 import LikedSongs from './pages/likedSongs';
 
 import './index.css';
@@ -141,6 +142,17 @@ function App() {
                 <RequireAuth>
                   <AppShell>
                     <LikedSongs />
+                  </AppShell>
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/admin"
+              element={
+                <RequireAuth>
+                  <AppShell>
+                    <AdminView />
                   </AppShell>
                 </RequireAuth>
               }

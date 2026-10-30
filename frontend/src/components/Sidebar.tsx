@@ -1,4 +1,4 @@
-import { Home, Search, Library, Heart, Plus, Settings, LogOut, User, X } from 'lucide-react';
+import { Home, Search, Library, Heart, Plus, Settings, LogOut, ShieldCheck, User, X } from 'lucide-react';
 import { cx } from '../lib/utils';
 import { usePlayer } from '../context/PlayerContext';
 import PlaylistCover from './PlaylistCover';
@@ -44,6 +44,8 @@ export default function Sidebar({
     { key: 'search', label: 'Search', icon: Search, target: 'search' },
     { key: 'library', label: 'Your Library', icon: Library, target: 'library' },
     { key: 'liked-songs', label: 'Liked Songs', icon: Heart, target: 'liked-songs' },
+    // Hanya tampilan: akses tetap dijaga backend (403 untuk non-admin).
+    ...(user.role === 'admin' ? [{ key: 'admin', label: 'Admin', icon: ShieldCheck, target: 'admin' } as const] : []),
   ] as const;
 
   return (
@@ -58,7 +60,7 @@ export default function Sidebar({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {/* Brand */}
         <div className="flex h-16 shrink-0 items-center gap-3 border-b border-line/40 px-6">
-          <div className="flex size-8 items-center justify-center bg-primary text-[14px] font-bold text-on-primary">M</div>
+          <img src="/logo.svg" alt="" className="size-8" />
           <span className="text-[16px] font-bold leading-6 tracking-[0.4px] text-ink">Melodi</span>
           <button
             type="button"
