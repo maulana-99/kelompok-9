@@ -62,7 +62,7 @@ func (s *authService) Login(req model.LoginRequest) (*model.AuthResponse, error)
 		return nil, err
 	}
 
-	return &model.AuthResponse{Token: token, User: user}, nil
+	return &model.AuthResponse{Token: token, User: model.NewSessionUser(user)}, nil
 }
 
 func (s *authService) Logout(token string) error {

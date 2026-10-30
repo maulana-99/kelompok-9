@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Music2, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { cx } from '../lib/utils';
 import { useAuth } from '../context/AuthContext';
@@ -56,9 +56,7 @@ export default function LoginView({ defaultMode = 'login' }: LoginViewProps) {
         {/* Header & branding */}
         <div className="flex w-full flex-col items-center px-8 pb-4 pt-8">
           <div className="pb-4">
-            <div className="flex size-12 items-center justify-center bg-primary text-on-primary shadow-logo">
-              <Music2 className="size-6" strokeWidth={2.5} />
-            </div>
+            <img src="/logo.svg" alt="" className="size-12 shadow-logo" />
           </div>
           <p className="pb-2 text-[14px] font-semibold uppercase leading-5 tracking-[0.7px] text-primary-soft">MELODI</p>
           <h1 className="text-[24px] font-bold leading-8 text-ink">{isLogin ? 'Welcome Back' : 'Create Account'}</h1>

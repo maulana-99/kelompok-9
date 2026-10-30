@@ -4,6 +4,7 @@ import (
 	"backend/internal/config"
 	"backend/internal/handler"
 	"backend/internal/middleware"
+	"backend/internal/model"
 	"backend/internal/repository"
 	"backend/internal/service"
 
@@ -35,6 +36,11 @@ func New(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	playlistSongService := service.NewPlaylistSongService(playlistRepo, playlistSongRepo)
 	playlistHandler := handler.NewPlaylistHandler(playlistService, authService)
 	playlistSongHandler := handler.NewPlaylistSongHandler(playlistSongService, authService)
+
+	likeRepo := repository.NewLikeRepository(db)
+	likeService := service.NewLikeService(likeRepo)
+	likeHandler := handler.NewLikeHandler(likeService)
+	adminHandler := handler.NewAdminHandler(service.NewAdminService(repository.NewAdminRepository(db)))
 
 	historyRepo := repository.NewHistoryRepository(db)
 	historyHandler := handler.NewHistoryHandler(service.NewHistoryService(historyRepo))
@@ -103,12 +109,28 @@ func New(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			playlists.DELETE("/:id/songs/:songId", requireAuth, playlistSongHandler.Delete)
 		}
 
+		// --- Like Songs (login required) ---
+		likes := v1.Group("/likes")
+		likes.Use(requireAuth)
+		{
+			likes.POST("", likeHandler.Create)
+			likes.GET("", likeHandler.List)
+			likes.DELETE("/:musicId", likeHandler.Delete)
+		}
+
 		// --- Listening history of the logged-in user (API design 8) ---
 		history := v1.Group("/history", requireAuth)
 		{
 			history.POST("", historyHandler.Record)
 			history.GET("", historyHandler.List)
 			history.DELETE("", historyHandler.Clear)
+		}
+
+		// --- Admin (RBAC): read-only view of registered users ---
+		admin := v1.Group("/admin", requireAuth, middleware.RequireRole(model.RoleAdmin))
+		{
+			admin.GET("/users", adminHandler.ListUsers)
+			admin.GET("/stats", adminHandler.Stats)
 		}
 
 		// Personal mixes built from history + playlists (see recommendation_service.go)

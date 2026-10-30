@@ -174,17 +174,20 @@ export interface BackendPlaylistSong {
   created_at: string;
 }
 
+export type UserRole = 'user' | 'admin';
+
 export interface AppUser {
   id?: number;
   name: string;
   username: string;
   created_at?: string;
+  role?: UserRole;
 }
 
-export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library' | 'liked-songs' | 'profile';
+export type AppView = 'login' | 'home' | 'search' | 'playlist' | 'library' | 'liked-songs' | 'profile' | 'admin';
 
 /** Halaman yang bisa dibuka dari menu sidebar. */
-export type NavTarget = 'home' | 'search' | 'library' | 'liked-songs';
+export type NavTarget = 'home' | 'search' | 'library' | 'liked-songs' | 'admin';
 
 export interface NavigationEntry {
   view: AppView;
@@ -225,4 +228,34 @@ export interface AppContext {
 export interface MusicLyrics {
   text: string;
   source?: string;
+}
+
+/** GET /admin/users — satu user terdaftar beserta ringkasan aktivitasnya (khusus admin). */
+export interface AdminUser {
+  id: number;
+  name: string;
+  username: string;
+  role: UserRole;
+  created_at: string;
+  playlist_count: number;
+  liked_count: number;
+  play_count: number;
+  followers_count: number;
+  last_played: string | null;
+}
+
+export interface AdminUserList {
+  items: AdminUser[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** GET /admin/stats */
+export interface AdminStats {
+  total_users: number;
+  admins: number;
+  new_users_7d: number;
+  active_users_7d: number;
+  total_playlists: number;
 }
