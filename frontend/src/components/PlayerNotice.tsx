@@ -1,11 +1,16 @@
 import { useEffect } from 'react';
-import { Repeat, Repeat1, Shuffle } from 'lucide-react';
+import { CircleAlert, Repeat, Repeat1, Shuffle } from 'lucide-react';
 import type { RepeatMode } from '../types';
 
-/** Notifikasi singkat setelah tombol Acak/Ulangi diklik. `id` naik tiap klik supaya timer mulai ulang. */
-export type PlayerNoticeData = { id: number } & ({ kind: 'shuffle'; on: boolean } | { kind: 'repeat'; mode: RepeatMode });
+/** Notifikasi singkat (tombol Acak/Ulangi, lagu gagal dimuat). `id` naik tiap kali supaya timer mulai ulang. */
+export type PlayerNoticeData = { id: number } & (
+  | { kind: 'shuffle'; on: boolean }
+  | { kind: 'repeat'; mode: RepeatMode }
+  | { kind: 'error'; text: string }
+);
 
 const NOTICE_MS = 2200;
+const ERROR_NOTICE_MS = 5000;
 
 const REPEAT_TEXT: Record<RepeatMode, string> = {
   off: 'Ulangi mati — mix baru disambung setelah antrean habis',
@@ -15,11 +20,12 @@ const REPEAT_TEXT: Record<RepeatMode, string> = {
 
 export default function PlayerNotice({ notice, onDone }: { notice: PlayerNoticeData | null; onDone: () => void }) {
   const id = notice?.id;
+  const kind = notice?.kind;
   useEffect(() => {
     if (id === undefined) return undefined;
-    const timer = window.setTimeout(onDone, NOTICE_MS);
+    const timer = window.setTimeout(onDone, kind === 'error' ? ERROR_NOTICE_MS : NOTICE_MS);
     return () => window.clearTimeout(timer);
-  }, [id, onDone]);
+  }, [id, kind, onDone]);
 
   let text = '';
   let icon = null;
@@ -29,6 +35,9 @@ export default function PlayerNotice({ notice, onDone }: { notice: PlayerNoticeD
   } else if (notice?.kind === 'repeat') {
     text = REPEAT_TEXT[notice.mode];
     icon = notice.mode === 'one' ? <Repeat1 className="size-4 shrink-0" /> : <Repeat className="size-4 shrink-0" />;
+  } else if (notice?.kind === 'error') {
+    text = notice.text;
+    icon = <CircleAlert className="size-4 shrink-0" />;
   }
 
   // Live region selalu ada di DOM supaya pembaca layar ikut mengumumkan perubahan.
@@ -41,13 +50,10 @@ export default function PlayerNotice({ notice, onDone }: { notice: PlayerNoticeD
         >
           <span
             className={
-              notice.kind === 'shuffle'
-                ? notice.on
-                  ? 'text-primary'
-                  : 'text-muted'
-                : notice.mode !== 'off'
-                  ? 'text-primary'
-                  : 'text-muted'
+              (notice.kind === 'error' ||
+              (notice.kind === 'shuffle' ? notice.on : notice.mode !== 'off'))
+                ? 'text-primary'
+                : 'text-muted'
             }
           >
             {icon}

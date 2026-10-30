@@ -21,6 +21,14 @@ export function streamUrl(videoId: string): string {
   return `${API_URL}/music/${encodeURIComponent(videoId)}/stream`;
 }
 
+// POST /music/:id/prepare — server menyiapkan URL stream lagu berikutnya di
+// latar belakang, supaya saat Next lagunya langsung bunyi. Gagal pun tidak apa-apa.
+export function prepareStream(videoId: string): void {
+  void fetch(`${API_URL}/music/${encodeURIComponent(videoId)}/prepare`, { method: 'POST', keepalive: true }).catch(
+    () => undefined,
+  );
+}
+
 // Thumbnail di-proxy lewat backend; sebagian ad-blocker/firewall memblokir
 // request langsung ke domain googleusercontent.com dari origin lain.
 export function thumbUrl(rawUrl: string): string {

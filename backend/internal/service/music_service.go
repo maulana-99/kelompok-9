@@ -52,6 +52,12 @@ const (
 	// Time limit for calling yt-dlp. Free cloud instances (Render) are slow
 	// to solve the JS challenge, so 30s is not enough there.
 	resolveTimeout = 90 * time.Second
+	// Background resolves started by PrepareStream at once (each is one yt-dlp process).
+	prepareParallel = 2
+	// A fresh googlevideo URL can answer 403 for ~2 s: retry it this often, this far apart.
+	upstreamWarmupTries = 5
+	upstreamWarmupDelay = 800 * time.Millisecond
+	upstreamFreshFor    = 15 * time.Second
 	// Music metadata barely changes; cache the parsed info for a day.
 	infoCacheTTL = 24 * time.Hour
 	// Time limit for one innertube player call.
@@ -81,6 +87,8 @@ type MusicService interface {
 	GetInfos(ctx context.Context, videoIDs []string) ([]model.MusicResult, error)
 	// OpenStream opens an audio connection for a video ID and returns an upstream response
 	OpenStream(ctx context.Context, videoID, rangeHeader string) (*http.Response, error)
+	// PrepareStream warms the stream URL cache in the background (fire and forget).
+	PrepareStream(videoID string) error
 	// OpenThumbnail retrieves thumbnail images.
 	OpenThumbnail(ctx context.Context, rawURL string) (*http.Response, error)
 	// Genres lists the YouTube Music browse categories (moods and genres).
@@ -131,8 +139,9 @@ type searchState struct {
 }
 
 type streamEntry struct {
-	url    string
-	expiry time.Time
+	url      string
+	resolved time.Time
+	expiry   time.Time
 }
 
 type infoEntry struct {
@@ -905,9 +914,64 @@ func (s *musicService) resolveStream(ctx context.Context, videoID string) (strin
 	}
 	s.mu.Unlock()
 
-	ctx, cancel := context.WithTimeout(ctx, resolveTimeout)
-	defer cancel()
+	// yt-dlp takes seconds. Share one run per video between concurrent callers,
+	// and keep its result even when the browser gives up waiting: the player's
+	// retry then hits the cache instead of starting yt-dlp from scratch.
+	// The debug extractor-args override changes the yt-dlp run, so it is part of the key.
+	key := videoID
+	if v, _ := ctx.Value(extractorArgsKey{}).(string); v != "" {
+		key += "|" + v
+	}
+	ch := streamFlight.DoChan(key, func() (any, error) {
+		runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), resolveTimeout)
+		defer cancel()
+		return s.runYtDlp(runCtx, videoID)
+	})
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return "", res.Err
+		}
+		return res.Val.(string), nil
+	}
+}
 
+// PrepareStream resolves the stream URL in the background so the next track
+// in the queue starts without waiting for yt-dlp. At most prepareParallel
+// resolves run at once; extra requests are dropped, not queued.
+func (s *musicService) PrepareStream(videoID string) error {
+	if !musicIDPattern.MatchString(videoID) {
+		return ErrInvalidMusicID
+	}
+	if _, fresh, ok := s.cachedStream(videoID); ok && !fresh {
+		return nil // resolved earlier and past its warm-up: nothing to prepare
+	}
+	select {
+	case prepareSlots <- struct{}{}:
+	default:
+		return nil
+	}
+	go func() {
+		defer func() { <-prepareSlots }()
+		ctx, cancel := context.WithTimeout(context.Background(), resolveTimeout)
+		defer cancel()
+		streamURL, err := s.resolveStream(ctx, videoID)
+		if err != nil {
+			log.Printf("prepare stream %s: %v", videoID, err)
+			return
+		}
+		// Also wait out the URL's 403 warm-up, so the real request is served at once.
+		if res, err := s.fetchUpstream(ctx, streamURL, "bytes=0-0", upstreamWarmupTries); err == nil {
+			res.Body.Close()
+		}
+	}()
+	return nil
+}
+
+// runYtDlp calls yt-dlp for the direct audio URL and caches it.
+func (s *musicService) runYtDlp(ctx context.Context, videoID string) (string, error) {
 	args := []string{
 		"-f", "bestaudio[ext=m4a]/bestaudio", // m4a is the most compatible across browsers
 		"--no-playlist",
@@ -966,7 +1030,8 @@ func (s *musicService) resolveStream(ctx context.Context, videoID string) (strin
 	}
 
 	s.mu.Lock()
-	s.streams[videoID] = streamEntry{url: url, expiry: time.Now().Add(streamCacheTTL)}
+	now := time.Now()
+	s.streams[videoID] = streamEntry{url: url, resolved: now, expiry: now.Add(streamCacheTTL)}
 	s.mu.Unlock()
 
 	return url, nil
@@ -1082,32 +1147,26 @@ func firstMeaningfulLine(s string) string {
 }
 
 func (s *musicService) OpenStream(ctx context.Context, videoID, rangeHeader string) (*http.Response, error) {
-	// At most two attempts: a cached URL may have just expired
-	// (403 from googlevideo) — drop the cache and resolve once more.
+	// At most two resolves: a cached URL may have expired (403 from
+	// googlevideo) — drop the cache and resolve once more.
 	for attempt := 0; attempt < 2; attempt++ {
 		streamURL, err := s.resolveStream(ctx, videoID)
 		if err != nil {
 			return nil, err
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
-		if err != nil {
-			return nil, err
+		// Only a URL resolved moments ago gets the 403 warm-up retries; an
+		// older cached URL that answers 403 has expired, so re-resolve at once.
+		tries := 1
+		if _, fresh, _ := s.cachedStream(videoID); fresh {
+			tries = upstreamWarmupTries
 		}
-		if rangeHeader != "" {
-			req.Header.Set("Range", rangeHeader)
-		} else {
-			// Browsers sometimes request without Range; ask for an open
-			// range from byte 0 so the response stays 206 + Content-Range.
-			req.Header.Set("Range", "bytes=0-")
-		}
-
-		res, err := s.streamClient.Do(req)
+		res, err := s.fetchUpstream(ctx, streamURL, rangeHeader, tries)
 		if err != nil {
 			return nil, err
 		}
 
-		// Expired/revoked URL → resolve again.
+		// Still refused after the warm-up retries: treat the URL as expired.
 		if res.StatusCode == http.StatusForbidden && attempt == 0 {
 			res.Body.Close()
 			s.mu.Lock()
@@ -1123,4 +1182,47 @@ func (s *musicService) OpenStream(ctx context.Context, videoID, rangeHeader stri
 		return res, nil
 	}
 	return nil, fmt.Errorf("%w: upstream terus menolak (403)", ErrStreamUnavailable)
+}
+
+// cachedStream reports the cached URL for videoID and whether it was resolved
+// within upstreamFreshFor (still inside googlevideo's 403 warm-up window).
+func (s *musicService) cachedStream(videoID string) (url string, fresh, ok bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entry, ok := s.streams[videoID]
+	if !ok || time.Now().After(entry.expiry) {
+		return "", false, false
+	}
+	return entry.url, time.Since(entry.resolved) < upstreamFreshFor, true
+}
+
+// fetchUpstream GETs a googlevideo URL. A freshly resolved URL often answers
+// 403 for its first second or two and then serves normally, so a 403 is
+// retried on the same URL up to `tries` times before giving up on it.
+func (s *musicService) fetchUpstream(ctx context.Context, streamURL, rangeHeader string, tries int) (*http.Response, error) {
+	if rangeHeader == "" {
+		// Browsers sometimes request without Range; ask for an open
+		// range from byte 0 so the response stays 206 + Content-Range.
+		rangeHeader = "bytes=0-"
+	}
+	for try := 1; ; try++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Range", rangeHeader)
+		res, err := s.streamClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if res.StatusCode != http.StatusForbidden || try >= tries {
+			return res, nil
+		}
+		res.Body.Close()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(upstreamWarmupDelay):
+		}
+	}
 }

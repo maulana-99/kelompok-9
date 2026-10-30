@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { fetchMusicInfos, getSongMix, streamUrl } from '../lib/music';
+import { fetchMusicInfos, getSongMix, prepareStream, streamUrl } from '../lib/music';
 import {
   fetchLikedSongs,
   likeSong,
@@ -165,6 +165,10 @@ function writeTracksCache(finalTracks: Track[]) {
  * Berdiri DI ATAS <Routes>, sehingga `<audio>` tidak pernah unmount saat
  * user pindah halaman — musik tetap jalan.
  */
+// Stream macet tanpa data selama ini -> muat ulang. Pemutaran pertama bisa butuh ~10 dtk (yt-dlp).
+const STREAM_STALL_MS = 15_000;
+const STREAM_MAX_RETRIES = 4; // jeda 1, 2, 4, 8 dtk: cukup untuk server yang baru restart
+
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -199,6 +203,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const knownRef = useRef<Map<string, Track>>(new Map(readTracksCache().map((track) => [track.id, track])));
 
   const audioRef = useRef<HTMLAudioElement>(null);
+  // Percobaan ulang stream untuk lagu yang sedang diputar (lihat recoverAudio).
+  // stale = stream perlu dimuat ulang sebelum diputar lagi (gagal, macet, atau retry dibatalkan).
+  const recovery = useRef<{ videoId: string | null; tries: number; resumeAt: number; stale: boolean }>({
+    videoId: null,
+    tries: 0,
+    resumeAt: 0,
+    stale: false,
+  });
+  const stallTimer = useRef<number | undefined>(undefined);
+  const retryTimer = useRef<number | undefined>(undefined);
+  const clearStall = useCallback(() => {
+    window.clearTimeout(stallTimer.current);
+    stallTimer.current = undefined;
+  }, []);
+  const clearRetry = useCallback(() => {
+    window.clearTimeout(retryTimer.current);
+    retryTimer.current = undefined;
+  }, []);
   const pathname = location.pathname;
 
   // Lacak posisi history supaya tombol Back/Forward benar-benar mencerminkan
@@ -254,30 +276,113 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audio.removeAttribute('src');
       return;
     }
+    recovery.current = { videoId: currentVideoId, tries: 0, resumeAt: 0, stale: false };
+    clearStall();
+    clearRetry();
     audio.src = streamUrl(currentVideoId);
     audio.load();
-  }, [currentVideoId]);
+  }, [currentVideoId, clearStall, clearRetry]);
+
+  // ---- Audio: pulih sendiri saat stream gagal atau macet ----
+  // Stream pertama bisa lambat (server memanggil yt-dlp). Kalau gagal atau tidak ada
+  // data terlalu lama, muat ulang dari posisi terakhir tanpa user harus ganti lagu.
+  const isPlayingRef = useRef(isPlaying);
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  // Muat ulang stream lagu ini, lanjut dari posisi yang disimpan di recovery.resumeAt.
+  const reloadStream = (audio: HTMLAudioElement, videoId: string) => {
+    recovery.current.stale = false;
+    audio.src = streamUrl(videoId);
+    audio.load();
+  };
+
+  const recoverAudio = () => {
+    const audio = audioRef.current;
+    const r = recovery.current;
+    if (!audio || !currentVideoId || r.videoId !== currentVideoId) return;
+    clearStall();
+    // onError dan watchdog macet bisa datang bersamaan: satu jadwal muat ulang saja.
+    if (retryTimer.current !== undefined) return;
+    r.stale = true;
+    if (r.tries >= STREAM_MAX_RETRIES) {
+      setIsPlaying(false);
+      setNotice((prev) => ({
+        id: (prev?.id ?? 0) + 1,
+        kind: 'error',
+        text: 'Lagu ini gagal dimuat. Tekan putar untuk mencoba lagi, atau pilih lagu lain.',
+      }));
+      r.tries = 0; // tombol putar berikutnya dapat jatah percobaan baru
+      return;
+    }
+    r.tries += 1;
+    if (audio.currentTime > 0) r.resumeAt = audio.currentTime;
+    const videoId = currentVideoId;
+    retryTimer.current = window.setTimeout(() => {
+      retryTimer.current = undefined;
+      if (recovery.current.videoId !== videoId) return;
+      reloadStream(audio, videoId);
+      if (isPlayingRef.current) void audio.play().catch(() => undefined);
+    }, 1000 * 2 ** (r.tries - 1));
+  };
+
+  // Tidak ada data baru selama STREAM_STALL_MS saat sedang diputar -> anggap macet.
+  const watchStall = () => {
+    if (!isPlayingRef.current || stallTimer.current !== undefined) return;
+    stallTimer.current = window.setTimeout(() => {
+      stallTimer.current = undefined;
+      recoverAudio();
+    }, STREAM_STALL_MS);
+  };
 
   // ---- Audio: ikuti state play/pause ----
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !currentVideoId) return;
     if (isPlaying) {
+      // Stream gagal/macet dan belum dimuat ulang (retry habis atau dibatalkan pause):
+      // tombol putar memuat ulang sekarang, tanpa menunggu jadwal retry.
+      if (audio.error || recovery.current.stale) {
+        clearRetry();
+        if (audio.currentTime > 0) recovery.current.resumeAt = audio.currentTime;
+        reloadStream(audio, currentVideoId);
+      }
       void audio.play().catch((err) => {
-        // AbortError muncul saat src diganti oleh lagu berikutnya — bukan kegagalan nyata.
-        if (err instanceof DOMException && err.name === 'AbortError') return;
+        // AbortError: src diganti lagu berikutnya. NotSupportedError: stream gagal dimuat,
+        // ditangani recoverAudio (onError) yang memutar ulang sendiri. Keduanya bukan "berhenti".
+        if (err instanceof DOMException && (err.name === 'AbortError' || err.name === 'NotSupportedError')) return;
         setIsPlaying(false);
       });
     } else {
+      // User menekan pause: batalkan muat ulang yang dijadwalkan. stale tetap true,
+      // jadi tombol putar berikutnya yang memuat ulang. (Event `pause` dari browser
+      // sendiri saat stream gagal tidak boleh membatalkannya, jadi bukan di onPause.)
+      clearRetry();
       audio.pause();
     }
-  }, [isPlaying, currentVideoId]);
+  }, [isPlaying, currentVideoId, clearRetry]);
 
   // ---- Audio: volume ----
   useEffect(() => {
     const audio = audioRef.current;
     if (audio) audio.volume = volume;
   }, [volume]);
+
+  // ---- Siapkan lagu berikutnya di server, supaya Next langsung bunyi ----
+  const preparedIds = useRef(new Set<string>());
+  useEffect(() => {
+    if (!currentTrackId) return;
+    const index = queue.indexOf(currentTrackId);
+    if (index === -1) return;
+    const nextId = queue[index + 1] ?? (repeat === 'all' ? queue[0] : undefined);
+    if (!nextId || nextId === currentTrackId) return;
+    const videoId = (knownRef.current.get(nextId) ?? knownTracks.find((track) => track.id === nextId))?.videoId;
+    if (!videoId || preparedIds.current.has(videoId)) return;
+    if (preparedIds.current.size > 200) preparedIds.current.clear();
+    preparedIds.current.add(videoId);
+    prepareStream(videoId);
+  }, [currentTrackId, queue, repeat, knownTracks]);
 
   // ---- Known tracks: persist ke localStorage ----
   useEffect(() => {
@@ -699,6 +804,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (audio && currentVideoId) {
       audio.currentTime = seconds;
       setProgress(seconds);
+      // Muat ulang yang masih tertunda harus lanjut dari posisi baru, bukan posisi lama.
+      recovery.current.resumeAt = recovery.current.stale ? seconds : 0;
     }
   };
 
@@ -884,10 +991,29 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       <audio
         ref={audioRef}
         preload="metadata"
-        onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        onTimeUpdate={(e) => {
+          setProgress(e.currentTarget.currentTime);
+          clearStall();
+        }}
+        onLoadedMetadata={(e) => {
+          const audio = e.currentTarget;
+          setDuration(audio.duration);
+          // Setelah muat ulang karena gagal: lanjut dari posisi terakhir.
+          if (recovery.current.resumeAt > 0) {
+            audio.currentTime = recovery.current.resumeAt;
+            recovery.current.resumeAt = 0;
+          }
+        }}
+        onPlaying={() => {
+          clearStall();
+          recovery.current.tries = 0;
+          recovery.current.stale = false;
+        }}
+        onWaiting={watchStall}
+        onStalled={watchStall}
+        onPause={clearStall}
         onEnded={handleEnded}
-        onError={() => setIsPlaying(false)}
+        onError={recoverAudio}
       />
 
       {children}
