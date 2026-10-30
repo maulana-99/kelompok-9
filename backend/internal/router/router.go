@@ -7,6 +7,7 @@ import (
 	"backend/internal/model"
 	"backend/internal/repository"
 	"backend/internal/service"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -90,6 +91,8 @@ func New(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			music.GET("/genres/:genreId", musicHandler.GenrePlaylists)
 			music.GET("/playlists/:playlistId", musicHandler.Playlist)
 			music.GET("/:musicId/stream", musicHandler.Stream)
+			// Prefetch of the next queued track: a few per minute is normal use.
+			music.POST("/:musicId/prepare", middleware.RateLimit(30, time.Minute), musicHandler.Prepare)
 			music.GET("/:musicId/radio", requireAuth, musicHandler.Radio)
 			music.GET("/:musicId/mix", requireAuth, recommendationHandler.SongMix)
 			music.GET("/:musicId/lyrics", requireAuth, musicHandler.Lyrics)

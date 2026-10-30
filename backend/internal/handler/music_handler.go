@@ -163,6 +163,16 @@ func (h *MusicHandler) Stream(c *gin.Context) {
 	_, _ = io.Copy(c.Writer, upstream.Body)
 }
 
+// POST /api/v1/music/:musicId/prepare — resolve the stream URL in the background
+// so the track starts right away when the player reaches it.
+func (h *MusicHandler) Prepare(c *gin.Context) {
+	if err := h.service.PrepareStream(c.Param("musicId")); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+	c.Status(http.StatusAccepted)
+}
+
 // GET /api/v1/music/genres
 func (h *MusicHandler) Genres(c *gin.Context) {
 	genres, err := h.service.Genres(c.Request.Context())

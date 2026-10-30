@@ -10,6 +10,11 @@ import (
 // browseFlight merges concurrent misses of the same key into one upstream call.
 var browseFlight singleflight.Group
 
+// streamFlight shares one yt-dlp run per video ID.
+var streamFlight singleflight.Group
+
+var prepareSlots = make(chan struct{}, prepareParallel)
+
 // Keys come from user input (genre/playlist id), so bound the cache size.
 const browseCacheMax = 500
 
